@@ -1,7 +1,7 @@
 from scapy.all import sniff, Raw, TCP
 from datetime import datetime, UTC
-from .logger import init_db, log_message
-from .models import MCPMessageLog
+from mcp_shark.logger import init_db, log_message
+from mcp_shark.models import MCPMessageLog
 
 
 def packet_callback(packet):
@@ -25,7 +25,10 @@ def packet_callback(packet):
                     "message": decoded
                 }
 
-                print(f"[MCP-Shark] {src_ip}:{src_port} → {dst_ip}:{dst_port} | {decoded[:100]}...")
+                print(
+                    f"[MCP-Shark] {src_ip}:{src_port} → {dst_ip}:{dst_port} | "
+                    f"{decoded[:100]}..."
+                )
                 log_message(entry)
 
             except Exception:
