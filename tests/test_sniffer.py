@@ -55,9 +55,16 @@ def test_packet_callback(dummy_server):
     """Simulate sending an MCP-like JSON-RPC packet and verify it's logged."""
     host, port = dummy_server
 
-    jsonrpc_msg = b'{"jsonrpc":"2.0","method":"callTool","params":{"tool":"weather","location":"Berlin"}}'
-    pkt = Ether() / IP(src="127.0.0.1", dst=host) / TCP(sport=55555, dport=port) / Raw(load=jsonrpc_msg)
-
+    jsonrpc_msg = (
+        b'{"jsonrpc":"2.0","method":"callTool","params":{"tool":"weather",'
+        b'"location":"Berlin"}}'
+    )
+    pkt = (
+        Ether()
+        / IP(src="127.0.0.1", dst=host)
+        / TCP(sport=55555, dport=port)
+        / Raw(load=jsonrpc_msg)
+    )
     packet_callback(pkt)
 
     conn = sqlite3.connect(TEST_DB)

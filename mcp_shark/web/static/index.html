@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MCP-Shark Dashboard</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    .log { border-bottom: 1px solid #ccc; padding: 5px; }
+  </style>
+</head>
+<body>
+  <h1>MCP-Shark Dashboard</h1>
+  <div id="logs"></div>
+  <script>
+    const logsDiv = document.getElementById("logs");
+
+    function addLog(log) {
+      const div = document.createElement("div");
+      div.className = "log";
+      div.textContent = `[${log.timestamp}] ${log.src} → ${log.dst} | ${log.message}`;
+      logsDiv.prepend(div);
+    }
+
+    // Fetch historical logs
+    fetch("/logs?limit=10")
+      .then(res => res.json())
+      .then(data => data.forEach(addLog));
+
+    // Live updates via WebSocket
+    const ws = new WebSocket(`ws://${window.location.host}/ws`);
+    ws.onmessage = (event) => addLog(JSON.parse(event.data));
+  </script>
+</body>
+</html>

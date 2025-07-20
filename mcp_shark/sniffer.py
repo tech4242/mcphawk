@@ -36,5 +36,6 @@ def packet_callback(packet):
 
 
 def start_sniffer(filter: str = "tcp and host 127.0.0.1") -> None:
+    print(f"[MCP-Shark] Sniffing with filter: {filter}")
     init_db()
     sniff(filter=filter, prn=packet_callback, store=0)
