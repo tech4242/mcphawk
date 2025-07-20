@@ -1,7 +1,7 @@
 # mcp-shark 🦈
 
 **MCP-Shark** is a passive sniffer for **Model Context Protocol (MCP)** traffic, similar to Wireshark but MCP-focused.  
-It captures JSON-RPC traffic between MCP clients and WebSocket/TCP-based MCP servers.
+It captures JSON-RPC traffic between MCP clients and WebSocket/TCP-based MCP servers. MCP-Shark can reconstruct full JSON-RPC messages from raw TCP traffic without requiring a handshake.
 
 ## Running locally
 
