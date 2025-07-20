@@ -1,75 +1,99 @@
-from fastapi import FastAPI, WebSocket
-from fastapi.responses import HTMLResponse
-import sqlite3
+"""
+MCP-Shark Web Server (Phase 1.6 - Final)
+
+Provides:
+- REST API for log retrieval
+- WebSocket endpoint for live traffic updates
+- Static serving of the Vue dashboard
+"""
+
+import os
 import asyncio
-from typing import List
-from mcp_shark.logger import DB_FILE  # keep import for global variable ref
+import threading
+from fastapi import FastAPI, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from mcp_shark.logger import fetch_logs
+from mcp_shark.web.broadcaster import active_clients
 
 app = FastAPI()
 
+# Allow local UI dev or CDN-based dashboard
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# --- Serve Static HTML ---
-@app.get("/")
-def read_root():
-    with open("mcp_shark/web/static/index.html") as f:
-        return HTMLResponse(f.read())
 
-
-# --- REST API for historical logs ---
 @app.get("/logs")
 def get_logs(limit: int = 50):
     """
-    Return the latest MCP logs from the current database.
+    Retrieve recent logs from the database.
+
+    Args:
+        limit: Maximum number of logs to return (default: 50).
+
+    Returns:
+        List of log entries as dictionaries.
     """
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    cur.execute(
-        "CREATE TABLE IF NOT EXISTS logs ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-        "timestamp TEXT, src_ip TEXT, dst_ip TEXT, "
-        "src_port INTEGER, dst_port INTEGER, "
-        "direction TEXT, message TEXT)"
-    )
-    cur.execute(
-        "SELECT timestamp, src_ip, dst_ip, message "
-        "FROM logs ORDER BY id DESC LIMIT ?",
-        (limit,)
-    )
-    rows = cur.fetchall()
-    conn.close()
-    return [
-        {
-            "timestamp": r[0],
-            "src": r[1],
-            "dst": r[2],
-            "message": r[3]
-        }
-        for r in rows
-    ]
-
-
-# --- WebSocket for live updates ---
-active_connections: List[WebSocket] = []
+    return fetch_logs(limit)
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    await ws.accept()
-    active_connections.append(ws)
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for live traffic updates.
+    Keeps the connection alive until the client disconnects.
+    """
+    await websocket.accept()
+    active_clients.append(websocket)
+
     try:
         while True:
-            await asyncio.sleep(10)  # Keep alive
-    except:
-        active_connections.remove(ws)
+            await asyncio.sleep(30)
+    except Exception:
+        pass
+    finally:
+        if websocket in active_clients:
+            active_clients.remove(websocket)
 
 
-async def broadcast_new_log(log: dict):
-    dead = []
-    for ws in active_connections:
-        try:
-            await ws.send_json(log)
-        except:
-            dead.append(ws)
-    for ws in dead:
-        active_connections.remove(ws)
+def _start_sniffer_thread():
+    """
+    Start the sniffer in a dedicated daemon thread.
+    """
+    from mcp_shark.sniffer import start_sniffer
 
+    def safe_start():
+        return start_sniffer()  # ✅ force call with no arguments
+
+    thread = threading.Thread(target=safe_start, daemon=True)
+    thread.start()
+
+
+def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000):
+    """
+    Run the web server and optionally the sniffer.
+
+    Args:
+        sniffer: Whether to start the sniffer in a background thread.
+        host: Host to bind the server to.
+        port: Port to run the server on.
+    """
+    if sniffer:
+        _start_sniffer_thread()
+
+    print(f"[MCP-Shark] Starting sniffer and dashboard on http://{host}:{port}")
+
+    import uvicorn
+    uvicorn.run(app, host=host, port=port)
+
+
+# Serve static Vue dashboard (production mode)
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")

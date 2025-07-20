@@ -2,33 +2,87 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MCP-Shark Dashboard</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 20px; }
-    .log { border-bottom: 1px solid #ccc; padding: 5px; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #eee;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: none;
+      border-radius: 4px;
+    }
+    .log {
+      background: #222;
+      padding: 10px;
+      margin-bottom: 6px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .timestamp {
+      font-size: 12px;
+      color: #999;
+    }
+    strong {
+      color: #4fc08d;
+    }
   </style>
 </head>
 <body>
-  <h1>MCP-Shark Dashboard</h1>
-  <div id="logs"></div>
+  <div id="app">
+    <h1>mcp-shark dashboard</h1>
+    <input v-model="filter" placeholder="Search logs..." />
+
+    <div v-for="(log, i) in filteredLogs" :key="i" class="log">
+      <div class="timestamp">{{ log.timestamp }}</div>
+      <div>
+        <strong>{{ log.method || "Unknown" }}</strong>:
+        {{ log.message.slice(0, 200) }}
+      </div>
+    </div>
+  </div>
+
   <script>
-    const logsDiv = document.getElementById("logs");
+    const { createApp, ref, computed, onMounted } = Vue;
 
-    function addLog(log) {
-      const div = document.createElement("div");
-      div.className = "log";
-      div.textContent = `[${log.timestamp}] ${log.src} → ${log.dst} | ${log.message}`;
-      logsDiv.prepend(div);
-    }
+    createApp({
+      setup() {
+        const logs = ref([]);
+        const filter = ref("");
 
-    // Fetch historical logs
-    fetch("/logs?limit=10")
-      .then(res => res.json())
-      .then(data => data.forEach(addLog));
+        onMounted(() => {
+          const ws = new WebSocket(`ws://${window.location.host}/ws`);
+          ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data && data.timestamp) {
+              logs.value.unshift(data);
+              logs.value = logs.value.slice(0, 100);
+            }
+          };
+        });
 
-    // Live updates via WebSocket
-    const ws = new WebSocket(`ws://${window.location.host}/ws`);
-    ws.onmessage = (event) => addLog(JSON.parse(event.data));
+        const filteredLogs = computed(() =>
+          logs.value.filter((log) =>
+            JSON.stringify(log)
+              .toLowerCase()
+              .includes(filter.value.toLowerCase())
+          )
+        );
+
+        return { logs, filter, filteredLogs };
+      },
+    }).mount("#app");
   </script>
 </body>
 </html>

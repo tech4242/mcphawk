@@ -1,66 +1,67 @@
-import logging
-import warnings
-from datetime import datetime, UTC
+"""
+Sniffer for MCP-Shark: captures packets and logs JSON-RPC messages.
+"""
 
-from scapy.all import sniff, Raw, TCP, conf
+import asyncio
+import json
+from scapy.all import sniff, IP, TCP, Raw
+from mcp_shark.logger import log_message
+from mcp_shark.web.broadcaster import broadcast_new_log
 
-from mcp_shark.logger import init_db, log_message
-from mcp_shark.models import MCPMessageLog
-from mcp_shark.ws_reassembly import process_ws_packet
-
-# Suppress Scapy noisy logs
-logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
-conf.verb = 0
-warnings.filterwarnings("ignore", category=UserWarning)
+DEBUG = True
 
 
-def packet_callback(packet):
+async def _safe_broadcast(message: str) -> None:
+    """Safely broadcast to all connected WebSocket clients."""
+    try:
+        await broadcast_new_log(message)
+    except Exception as e:
+        if DEBUG:
+            print(f"[DEBUG] Broadcast failed: {e}")
+
+
+def _broadcast_in_any_loop(message: str) -> None:
+    """Handle broadcasting depending on whether an event loop exists."""
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_safe_broadcast(message))
+    except RuntimeError:
+        asyncio.run(_safe_broadcast(message))
+
+
+def packet_callback(pkt):
     """
-    Callback for each sniffed packet. Handles WebSocket reassembly first,
-    falls back to raw TCP if no complete WebSocket messages are found.
+    Callback for every sniffed packet.
+    Extract JSON-RPC messages from raw TCP payloads.
     """
-    if packet.haslayer(Raw) and packet.haslayer(TCP):
-        raw_data = packet[Raw].load
-        src_ip = packet[0][1].src
-        dst_ip = packet[0][1].dst
-        src_port = packet[TCP].sport
-        dst_port = packet[TCP].dport
+    if pkt.haslayer(Raw):
+        raw_payload = pkt[Raw].load
+        if DEBUG:
+            print(f"[DEBUG] Raw payload: {raw_payload[:60]}...")
 
-        # --- Try WebSocket reassembly first ---
-        messages = process_ws_packet(
-            src_ip, src_port, dst_ip, dst_port, raw_data
-        )
+        try:
+            decoded = raw_payload.decode("utf-8", errors="ignore")
+            if decoded.startswith("{") and "jsonrpc" in decoded:
+                msg = json.loads(decoded)
+                if DEBUG:
+                    print(f"[DEBUG] Sniffer captured: {msg}")
 
-        if not messages and b"jsonrpc" in raw_data:
-            # Fallback: raw TCP JSON-RPC detection
-            try:
-                messages = [raw_data.decode("utf-8", errors="ignore")]
-            except UnicodeDecodeError:
-                messages = []
-
-        for msg in messages:
-            if "jsonrpc" in msg:
-                entry: MCPMessageLog = {
-                    "timestamp": datetime.now(UTC),
-                    "src_ip": src_ip,
-                    "dst_ip": dst_ip,
-                    "src_port": src_port,
-                    "dst_port": dst_port,
-                    "direction": "unknown",
-                    "message": msg
+                entry = {
+                    "src_ip": pkt[IP].src if pkt.haslayer(IP) else "",
+                    "src_port": pkt[TCP].sport if pkt.haslayer(TCP) else 0,
+                    "dst_ip": pkt[IP].dst if pkt.haslayer(IP) else "",
+                    "dst_port": pkt[TCP].dport if pkt.haslayer(TCP) else 0,
+                    "message": decoded,
                 }
-
-                print(
-                    f"[MCP-Shark] {src_ip}:{src_port} → "
-                    f"{dst_ip}:{dst_port} | {msg[:100]}..."
-                )
                 log_message(entry)
+                _broadcast_in_any_loop(decoded)
+        except Exception as e:
+            if DEBUG:
+                print(f"[DEBUG] JSON decode failed: {e}")
 
 
-def start_sniffer(filter: str = "tcp and host 127.0.0.1") -> None:
-    """
-    Start sniffing network traffic using Scapy with the given BPF filter.
-    """
-    print(f"[MCP-Shark] Sniffing with filter: {filter}")
-    init_db()
-    sniff(filter=filter, prn=packet_callback, store=0)
+def start_sniffer(filter_expr: str = "tcp and host 127.0.0.1") -> None:
+    """Start sniffing packets."""
+    if DEBUG:
+        print(f"[DEBUG] Starting sniffer with filter: {filter_expr}")
+    sniff(filter=filter_expr, prn=packet_callback, store=False)

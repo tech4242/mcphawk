@@ -1,11 +1,11 @@
 """
-MCP-Shark CLI (Guaranteed Multi-Command Version)
+MCP-Shark CLI (Final Working Version)
 """
 
 import typer
 from mcp_shark.web.server import run_web
 
-# ✅ Typer multi-command app
+# ✅ Multi-command Typer app
 app = typer.Typer(help="MCP-Shark: Passive MCP traffic sniffer + dashboard")
 
 

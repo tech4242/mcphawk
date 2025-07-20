@@ -23,4 +23,4 @@ dependencies = [
 "Bug Tracker" = "https://github.com/tech4242/mcp-shark/issues"
 
 [project.scripts]
-mcp-shark = "mcp_shark.cli:main"
+mcp-shark = "mcp_shark.cli:app"
