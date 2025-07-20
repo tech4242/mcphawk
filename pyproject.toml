@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-shark"
+version = "0.1.0"
+description = "A passive MCP (Model Context Protocol) traffic sniffer for WebSocket-based MCP servers."
+authors = [
+  { name = "Your Name", email = "you@example.com" }
+]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = [
+  "scapy>=2.5.0",
+  "psutil>=6.0.0",
+  "typer>=0.12.0"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/tech4242/mcp-shark"
+"Bug Tracker" = "https://github.com/tech4242/mcp-shark/issues"
+
+[project.scripts]
+mcp-shark = "mcp_shark.cli:main"
