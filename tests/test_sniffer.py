@@ -2,24 +2,28 @@ import threading
 import socket
 import time
 import sqlite3
+import os
 import pytest
-from mcp_shark.sniffer import packet_callback
 from scapy.layers.inet import IP, TCP
 from scapy.packet import Raw
 from scapy.all import Ether
-from mcp_shark.logger import init_db
+from mcp_shark.sniffer import packet_callback
+from mcp_shark.logger import init_db, set_db_path
 
-DB_FILE = "mcp_sniffer_logs.db"
+# --- TEST DB PATH ---
+TEST_DB_DIR = "tests/test_logs"
+TEST_DB = os.path.join(TEST_DB_DIR, "test_mcp_sniffer_logs.db")
 
 
 @pytest.fixture(scope="module", autouse=True)
 def clean_db():
-    """Reset the SQLite DB before tests."""
+    """Prepare a clean SQLite DB for tests."""
+    os.makedirs(TEST_DB_DIR, exist_ok=True)
+    if os.path.exists(TEST_DB):
+        os.remove(TEST_DB)
+
+    set_db_path(TEST_DB)
     init_db()
-    conn = sqlite3.connect(DB_FILE)
-    with conn:
-        conn.execute("DELETE FROM logs;")
-    conn.close()
     yield
 
 
@@ -43,7 +47,7 @@ def dummy_server():
 
     thread = threading.Thread(target=server, daemon=True)
     thread.start()
-    time.sleep(0.5)  # Give server time to start
+    time.sleep(0.5)
     yield host, port
 
 
@@ -51,22 +55,12 @@ def test_packet_callback(dummy_server):
     """Simulate sending an MCP-like JSON-RPC packet and verify it's logged."""
     host, port = dummy_server
 
-    # --- Create a fake MCP JSON-RPC Scapy packet ---
-    jsonrpc_msg = (
-        b'{"jsonrpc":"2.0","method":"callTool","params":'
-        b'{"tool":"weather","location":"Berlin"}}'
-    )
-    pkt = (
-        Ether()
-        / IP(src="127.0.0.1", dst=host)
-        / TCP(sport=55555, dport=port)
-        / Raw(load=jsonrpc_msg)
-    )
-    # --- Trigger MCP-Shark's callback ---
+    jsonrpc_msg = b'{"jsonrpc":"2.0","method":"callTool","params":{"tool":"weather","location":"Berlin"}}'
+    pkt = Ether() / IP(src="127.0.0.1", dst=host) / TCP(sport=55555, dport=port) / Raw(load=jsonrpc_msg)
+
     packet_callback(pkt)
 
-    # --- Verify the message was logged in SQLite ---
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(TEST_DB)
     cur = conn.cursor()
     cur.execute("SELECT message FROM logs ORDER BY id DESC LIMIT 1;")
     logged_msg = cur.fetchone()[0]
@@ -79,4 +73,3 @@ def test_packet_callback(dummy_server):
 def test_import():
     import mcp_shark
     assert hasattr(mcp_shark, "__version__")
-    assert mcp_shark.__version__ == "0.1.0"

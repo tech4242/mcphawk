@@ -4,6 +4,12 @@ from mcp_shark.models import MCPMessageLog
 DB_FILE = "mcp_sniffer_logs.db"
 
 
+def set_db_path(path: str) -> None:
+    """Override the database path (useful for testing)."""
+    global DB_FILE
+    DB_FILE = path
+
+
 def init_db() -> None:
     conn = sqlite3.connect(DB_FILE)
     with conn:
@@ -26,13 +32,8 @@ def log_message(entry: MCPMessageLog) -> None:
     conn = sqlite3.connect(DB_FILE)
     with conn:
         conn.execute(
-            """
-            INSERT INTO logs (
-                timestamp, src_ip, dst_ip,
-                src_port, dst_port, direction, message
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
+            "INSERT INTO logs (timestamp, src_ip, dst_ip, src_port, dst_port, "
+            "direction, message) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 entry["timestamp"].isoformat(),
                 entry["src_ip"],
