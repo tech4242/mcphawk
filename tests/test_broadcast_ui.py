@@ -6,10 +6,8 @@ This ensures:
 - Broadcast messages are handled without errors.
 """
 
-import asyncio
 import json
 import os
-import sqlite3
 from scapy.all import Ether, IP, TCP, Raw
 from mcp_shark.sniffer import packet_callback
 from mcp_shark.logger import set_db_path, init_db, clear_logs, fetch_logs

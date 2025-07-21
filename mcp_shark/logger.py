@@ -1,95 +1,88 @@
 """
-Logger module for MCP-Shark.
+logger.py - MCP-Shark Logging Module
 
-Handles SQLite database operations for storing and retrieving logs.
-Automatically initializes or upgrades the database schema.
+Handles persistent logging of MCP-like messages, fully aligned with
+the MCPMessageLog TypedDict schema.
+
+Schema:
+    logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        src_ip TEXT,
+        dst_ip TEXT,
+        src_port INTEGER,
+        dst_port INTEGER,
+        direction TEXT CHECK(direction IN ('incoming', 'outgoing', 'unknown')),
+        message TEXT
+    )
 """
 
-import os
 import sqlite3
+from pathlib import Path
+from datetime import datetime, UTC
 from typing import List, Dict, Any
 
-# Default database path (backward compatible alias for tests)
-DB_PATH = os.getenv("MCP_SHARK_DB", "mcp_shark_logs.db")
-DB_FILE = DB_PATH  # ✅ Compatibility for old tests expecting DB_FILE
-
-
-def set_db_path(path: str) -> None:
-    """
-    Set a custom database path (useful for testing).
-    """
-    global DB_PATH, DB_FILE
-    DB_PATH = path
-    DB_FILE = path
+# Database file (shared with tests)
+DB_FILE = "mcp_shark_logs.db"
+DB_PATH = Path(__file__).resolve().parent.parent / DB_FILE
 
 
 def init_db() -> None:
     """
-    Initialize or upgrade the SQLite database to ensure it has the correct schema.
+    Initialize the SQLite database and ensure the logs table exists.
     """
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-
-    # ✅ Drop and re-create table if columns are missing
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             src_ip TEXT,
-            src_port INTEGER,
             dst_ip TEXT,
+            src_port INTEGER,
             dst_port INTEGER,
-            message TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            direction TEXT CHECK(direction IN ('incoming', 'outgoing', 'unknown')),
+            message TEXT
         )
         """
     )
-
-    # ✅ Check if `src_port` exists (upgrade old DBs)
-    cur.execute("PRAGMA table_info(logs)")
-    columns = [row[1] for row in cur.fetchall()]
-    if "src_port" not in columns:
-        cur.execute("DROP TABLE IF EXISTS logs")
-        cur.execute(
-            """
-            CREATE TABLE logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                src_ip TEXT,
-                src_port INTEGER,
-                dst_ip TEXT,
-                dst_port INTEGER,
-                message TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
-
     conn.commit()
     conn.close()
 
 
-def log_message(log_entry: Dict[str, Any]) -> None:
+def log_message(entry: Dict[str, Any]) -> None:
     """
-    Insert a log entry into the database.
+    Insert a new log entry.
 
     Args:
-        log_entry (dict): Keys: src_ip, src_port, dst_ip, dst_port, message
+        entry (Dict[str, Any]): Must contain MCPMessageLog fields:
+            timestamp (datetime) - If missing, current time is used
+            src_ip (str)
+            dst_ip (str)
+            src_port (int)
+            dst_port (int)
+            direction (str): 'incoming', 'outgoing', or 'unknown'
+            message (str)
     """
     init_db()
 
+    timestamp = entry.get("timestamp", datetime.now(tz=UTC))
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO logs (src_ip, src_port, dst_ip, dst_port, message)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO logs (timestamp, src_ip, dst_ip, src_port, dst_port, direction, message)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            log_entry.get("src_ip", ""),
-            log_entry.get("src_port", 0),
-            log_entry.get("dst_ip", ""),
-            log_entry.get("dst_port", 0),
-            log_entry.get("message", ""),
+            timestamp.isoformat(),
+            entry.get("src_ip"),
+            entry.get("dst_ip"),
+            entry.get("src_port"),
+            entry.get("dst_port"),
+            entry.get("direction", "unknown"),
+            entry.get("message"),
         ),
     )
     conn.commit()
@@ -98,33 +91,62 @@ def log_message(log_entry: Dict[str, Any]) -> None:
 
 def fetch_logs(limit: int = 100) -> List[Dict[str, Any]]:
     """
-    Fetch the latest logs from the database.
+    Fetch the latest logs.
+
+    Args:
+        limit (int): Max number of logs to retrieve.
+
+    Returns:
+        List of dictionaries matching MCPMessageLog format.
     """
     init_db()
+
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT id, src_ip, src_port, dst_ip, dst_port, message, timestamp
+        SELECT timestamp, src_ip, dst_ip, src_port, dst_port, direction, message
         FROM logs
         ORDER BY id DESC
         LIMIT ?
         """,
         (limit,),
     )
-    rows = [dict(row) for row in cur.fetchall()]
+    rows = cur.fetchall()
     conn.close()
-    return rows
+
+    return [
+        {
+            "timestamp": datetime.fromisoformat(row["timestamp"]),
+            "src_ip": row["src_ip"],
+            "dst_ip": row["dst_ip"],
+            "src_port": row["src_port"],
+            "dst_port": row["dst_port"],
+            "direction": row["direction"],
+            "message": row["message"],
+        }
+        for row in rows
+    ]
+
+
+# Add this near the top of logger.py (after DB_PATH definition)
+def set_db_path(path: str) -> None:
+    """
+    Override the default DB path (used in tests).
+    """
+    global DB_PATH
+    DB_PATH = Path(path)
 
 
 def clear_logs() -> None:
     """
     Clear all logs from the database.
+    Mainly used in tests.
     """
-    init_db()
+    init_db()  # Ensure the table exists before clearing
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("DELETE FROM logs")
+    cur.execute("DELETE FROM logs;")
     conn.commit()
     conn.close()
