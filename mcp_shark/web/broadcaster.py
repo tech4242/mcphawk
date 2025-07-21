@@ -1,17 +1,16 @@
 """
 WebSocket broadcasting utility for MCP-Shark.
 
-Keeps track of active WebSocket clients and provides a function
-to broadcast new log entries to all connected clients.
+Broadcasts full log entries to all connected WebSocket clients.
 """
 
-from typing import List
+from typing import List, Dict, Any
 from fastapi import WebSocket
 
 active_clients: List[WebSocket] = []
 
 
-async def broadcast_new_log(log_entry: dict):
+async def broadcast_new_log(log_entry: Dict[str, Any]):
     """
     Broadcast a new log entry to all connected WebSocket clients.
 
@@ -19,6 +18,9 @@ async def broadcast_new_log(log_entry: dict):
         log_entry: Dictionary representing the new log entry.
     """
     disconnected = []
+    print(
+        f"[DEBUG] Broadcasting to {len(active_clients)} clients: {log_entry}"
+    )
 
     for ws in active_clients:
         try:

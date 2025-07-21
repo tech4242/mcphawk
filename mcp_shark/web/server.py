@@ -1,5 +1,5 @@
 """
-MCP-Shark Web Server (Phase 1.6 - Final)
+MCP-Shark Web Server (Phase 1.7 - Fixed UI Updates)
 
 Provides:
 - REST API for log retrieval
@@ -10,12 +10,15 @@ Provides:
 import os
 import asyncio
 import threading
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 
 from mcp_shark.logger import fetch_logs
 from mcp_shark.web.broadcaster import active_clients
+
+DEBUG = True
 
 app = FastAPI()
 
@@ -38,9 +41,18 @@ def get_logs(limit: int = 50):
         limit: Maximum number of logs to return (default: 50).
 
     Returns:
-        List of log entries as dictionaries.
+        List of log entries as JSON-serializable dictionaries.
     """
-    return fetch_logs(limit)
+    logs = fetch_logs(limit)
+    if DEBUG:
+        print(f"[DEBUG] /logs returned {len(logs)} entries")
+    return JSONResponse(content=[
+        {
+            **log,
+            "timestamp": log["timestamp"].isoformat()  # ensure JSON-friendly
+        }
+        for log in logs
+    ])
 
 
 @app.websocket("/ws")
@@ -51,15 +63,19 @@ async def websocket_endpoint(websocket: WebSocket):
     """
     await websocket.accept()
     active_clients.append(websocket)
+    if DEBUG:
+        print(f"[DEBUG] WebSocket connected: {len(active_clients)} active clients")
 
     try:
         while True:
             await asyncio.sleep(30)
-    except Exception:
+    except WebSocketDisconnect:
         pass
     finally:
         if websocket in active_clients:
             active_clients.remove(websocket)
+        if DEBUG:
+            print(f"[DEBUG] WebSocket disconnected: {len(active_clients)} active clients")
 
 
 def _start_sniffer_thread():
@@ -69,7 +85,9 @@ def _start_sniffer_thread():
     from mcp_shark.sniffer import start_sniffer
 
     def safe_start():
-        return start_sniffer()  # ✅ force call with no arguments
+        if DEBUG:
+            print("[DEBUG] Sniffer thread starting...")
+        return start_sniffer()
 
     thread = threading.Thread(target=safe_start, daemon=True)
     thread.start()

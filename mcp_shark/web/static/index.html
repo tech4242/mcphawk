@@ -1,87 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MCP-Shark Dashboard</title>
+  <meta charset="UTF-8">
+  <title>mcp-shark Live Logs</title>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #111;
-      color: #eee;
-      margin: 0;
-      padding: 20px;
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 0 10px;
+      background: #f5f5f5;
     }
     h1 {
-      margin-bottom: 10px;
+      text-align: center;
+      color: #333;
     }
-    input {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 10px;
-      border: none;
-      border-radius: 4px;
-    }
-    .log {
-      background: #222;
+    .log-container {
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 5px;
       padding: 10px;
-      margin-bottom: 6px;
-      border-radius: 4px;
-      font-size: 14px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    ul {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+    li {
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+      font-family: monospace;
+    }
+    li:last-child {
+      border-bottom: none;
     }
     .timestamp {
-      font-size: 12px;
-      color: #999;
-    }
-    strong {
-      color: #4fc08d;
+      color: #888;
+      margin-right: 5px;
     }
   </style>
 </head>
 <body>
   <div id="app">
-    <h1>mcp-shark dashboard</h1>
-    <input v-model="filter" placeholder="Search logs..." />
-
-    <div v-for="(log, i) in filteredLogs" :key="i" class="log">
-      <div class="timestamp">{{ log.timestamp }}</div>
-      <div>
-        <strong>{{ log.method || "Unknown" }}</strong>:
-        {{ log.message.slice(0, 200) }}
-      </div>
+    <h1>MCP-Shark Live Logs</h1>
+    <div class="log-container">
+      <p v-if="logs.length === 0">No logs yet...</p>
+      <ul>
+        <li v-for="(log, index) in logs" :key="index">
+          <span class="timestamp">[{{ formatTimestamp(log.timestamp) }}]</span>
+          {{ log.message }}
+        </li>
+      </ul>
     </div>
   </div>
 
   <script>
-    const { createApp, ref, computed, onMounted } = Vue;
+    const { createApp, ref, onMounted } = Vue;
 
     createApp({
       setup() {
         const logs = ref([]);
-        const filter = ref("");
+
+        async function fetchLogs() {
+          try {
+            const res = await fetch("/logs?limit=50");
+            const data = await res.json();
+            logs.value = data.reverse(); // oldest first
+          } catch (err) {
+            console.error("Failed to fetch logs:", err);
+          }
+        }
+
+        function startWebSocket() {
+          const ws = new WebSocket(`ws://${window.location.host}/ws`);
+          ws.onopen = () => console.log("✅ WebSocket connected");
+          ws.onmessage = (event) => {
+                const log = JSON.parse(event.data);
+                const ts = new Date(log.timestamp).toLocaleTimeString();
+                addLog(`[${ts}] ${log.message}`);
+            };
+          ws.onerror = (err) => console.error("❌ WebSocket error:", err);
+          ws.onclose = () => {
+            console.warn("⚠️ WebSocket closed, reconnecting in 3s...");
+            setTimeout(startWebSocket, 3000);
+          };
+        }
+
+        function formatTimestamp(ts) {
+          try {
+            return new Date(ts).toLocaleTimeString();
+          } catch {
+            return ts;
+          }
+        }
 
         onMounted(() => {
-          const ws = new WebSocket(`ws://${window.location.host}/ws`);
-          ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data && data.timestamp) {
-              logs.value.unshift(data);
-              logs.value = logs.value.slice(0, 100);
-            }
-          };
+          fetchLogs();
+          startWebSocket();
         });
 
-        const filteredLogs = computed(() =>
-          logs.value.filter((log) =>
-            JSON.stringify(log)
-              .toLowerCase()
-              .includes(filter.value.toLowerCase())
-          )
-        );
-
-        return { logs, filter, filteredLogs };
-      },
+        return { logs, formatTimestamp };
+      }
     }).mount("#app");
   </script>
 </body>

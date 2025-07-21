@@ -55,4 +55,10 @@ mcp-shark web
 
 # Get help
 mcp-shark --help
+
+# Run dummy mcp server for tests
+python3 -m dummy_mcp_server.py
+
+# Run dummy MCP call
+(echo -n '{"jsonrpc":"2.0","method":"ping"}'; sleep 1) | nc 127.0.0.1 12345
 ```

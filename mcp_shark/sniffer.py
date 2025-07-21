@@ -4,6 +4,7 @@ Cross-platform: works on macOS (loopback) and Linux.
 """
 
 import asyncio
+from datetime import UTC, datetime
 import json
 import platform
 from scapy.all import sniff, IP, TCP, Raw, conf
@@ -13,22 +14,20 @@ from mcp_shark.web.broadcaster import broadcast_new_log
 DEBUG = True
 
 
-async def _safe_broadcast(message: str) -> None:
-    """Safely broadcast to all connected WebSocket clients."""
+async def _safe_broadcast(log_entry: dict) -> None:
     try:
-        await broadcast_new_log({"message": message})
+        await broadcast_new_log(log_entry)
     except Exception as e:
         if DEBUG:
             print(f"[DEBUG] Broadcast failed: {e}")
 
 
-def _broadcast_in_any_loop(message: str) -> None:
-    """Handle broadcasting depending on whether an event loop exists."""
+def _broadcast_in_any_loop(log_entry: dict) -> None:
     try:
         loop = asyncio.get_running_loop()
-        loop.create_task(_safe_broadcast(message))
+        loop.create_task(_safe_broadcast(log_entry))
     except RuntimeError:
-        asyncio.run(_safe_broadcast(message))
+        asyncio.run(_safe_broadcast(log_entry))
 
 
 def packet_callback(pkt):
@@ -47,17 +46,23 @@ def packet_callback(pkt):
                 if DEBUG:
                     print(f"[DEBUG] Sniffer captured: {decoded}")
 
+                ts = datetime.now(tz=UTC)
                 entry = {
+                    "timestamp": ts,
                     "src_ip": pkt[IP].src if pkt.haslayer(IP) else "",
                     "src_port": pkt[TCP].sport if pkt.haslayer(TCP) else 0,
                     "dst_ip": pkt[IP].dst if pkt.haslayer(IP) else "",
                     "dst_port": pkt[TCP].dport if pkt.haslayer(TCP) else 0,
-                    "direction": "unknown",  # Could be improved later
+                    "direction": "unknown",
                     "message": decoded,
                 }
 
                 log_message(entry)
-                _broadcast_in_any_loop(decoded)
+
+                # Convert timestamp to ISO only for WebSocket broadcast
+                broadcast_entry = dict(entry)
+                broadcast_entry["timestamp"] = ts.isoformat()
+                _broadcast_in_any_loop(broadcast_entry)
         except Exception as e:
             if DEBUG:
                 print(f"[DEBUG] JSON decode failed: {e}")
