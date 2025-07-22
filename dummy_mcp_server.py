@@ -1,5 +1,6 @@
 import socket
 import threading
+import json
 
 HOST = "127.0.0.1"
 PORT = 12345  # MCP-Shark should sniff this port
@@ -12,10 +13,33 @@ def handle_client(conn, addr):
             data = conn.recv(1024)
             if not data:
                 break
-            print(f"[DUMMY MCP] Received: {data.decode(errors='ignore')}")
-            # Echo back something MCP-like
-            response = '{"jsonrpc":"2.0","result":"ok"}\n'.encode()
-            conn.sendall(response)
+
+            raw_msg = data.decode(errors="ignore").strip()
+            print(f"[DUMMY MCP] Received: {raw_msg}")
+
+            try:
+                # Parse incoming JSON-RPC request
+                request = json.loads(raw_msg)
+                request_id = request.get("id")
+
+                # Build realistic JSON-RPC response
+                response = {
+                    "jsonrpc": "2.0",
+                    "result": "ok",
+                    "id": request_id  # echo back same id if present
+                }
+
+            except json.JSONDecodeError:
+                print("[DUMMY MCP] Invalid JSON received, sending error response")
+                response = {
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32700, "message": "Parse error"},
+                    "id": None
+                }
+
+            # Send back response
+            conn.sendall((json.dumps(response) + "\n").encode())
+
     finally:
         conn.close()
 

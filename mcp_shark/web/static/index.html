@@ -1,109 +1,144 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>mcp-shark Live Logs</title>
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <meta charset="UTF-8" />
+  <title>MCP-Shark Live Logs</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      max-width: 800px;
-      margin: 20px auto;
-      padding: 0 10px;
-      background: #f5f5f5;
+      background-color: #1e1e1e;
+      color: #ddd;
+      font-family: monospace;
+      margin: 0;
+      padding: 0;
     }
     h1 {
       text-align: center;
-      color: #333;
-    }
-    .log-container {
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 5px;
+      background: #333;
       padding: 10px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-    }
-    ul {
-      list-style-type: none;
-      padding: 0;
       margin: 0;
     }
-    li {
-      padding: 8px;
-      border-bottom: 1px solid #eee;
-      font-family: monospace;
+    #logs {
+      max-width: 1000px;
+      margin: 10px auto;
+      padding: 10px;
     }
-    li:last-child {
-      border-bottom: none;
+    .pair {
+      border: 1px solid #555;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      padding: 5px 10px;
+      background-color: #2b2b2b;
     }
     .timestamp {
-      color: #888;
-      margin-right: 5px;
+      color: #aaa;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .entry {
+      margin: 4px 0;
+      padding: 4px;
+      background-color: #1e1e1e;
+      border: 1px solid #444;
+      border-radius: 3px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    .request {
+      border-left: 3px solid #6a9fb5;
+    }
+    .response {
+      border-left: 3px solid #b58900;
     }
   </style>
 </head>
 <body>
-  <div id="app">
-    <h1>MCP-Shark Live Logs</h1>
-    <div class="log-container">
-      <p v-if="logs.length === 0">No logs yet...</p>
-      <ul>
-        <li v-for="(log, index) in logs" :key="index">
-          <span class="timestamp">[{{ formatTimestamp(log.timestamp) }}]</span>
-          {{ log.message }}
-        </li>
-      </ul>
-    </div>
-  </div>
+  <h1>MCP-Shark Live Logs</h1>
+  <div id="logs"></div>
 
   <script>
-    const { createApp, ref, onMounted } = Vue;
+    const logsDiv = document.getElementById("logs");
+    const pairs = {};
 
-    createApp({
-      setup() {
-        const logs = ref([]);
-
-        async function fetchLogs() {
-          try {
-            const res = await fetch("/logs?limit=50");
-            const data = await res.json();
-            logs.value = data.reverse(); // oldest first
-          } catch (err) {
-            console.error("Failed to fetch logs:", err);
-          }
-        }
-
-        function startWebSocket() {
-          const ws = new WebSocket(`ws://${window.location.host}/ws`);
-          ws.onopen = () => console.log("✅ WebSocket connected");
-          ws.onmessage = (event) => {
-                const log = JSON.parse(event.data);
-                const ts = new Date(log.timestamp).toLocaleTimeString();
-                addLog(`[${ts}] ${log.message}`);
-            };
-          ws.onerror = (err) => console.error("❌ WebSocket error:", err);
-          ws.onclose = () => {
-            console.warn("⚠️ WebSocket closed, reconnecting in 3s...");
-            setTimeout(startWebSocket, 3000);
-          };
-        }
-
-        function formatTimestamp(ts) {
-          try {
-            return new Date(ts).toLocaleTimeString();
-          } catch {
-            return ts;
-          }
-        }
-
-        onMounted(() => {
-          fetchLogs();
-          startWebSocket();
-        });
-
-        return { logs, formatTimestamp };
+    function prettyJSON(obj) {
+      try {
+        if (typeof obj === "string") obj = JSON.parse(obj);
+        return JSON.stringify(obj, null, 2);
+      } catch {
+        return obj;
       }
-    }).mount("#app");
+    }
+
+    function addOrUpdatePair(entry) {
+      const idKey = entry.method ? entry.method + "-" + entry.timestamp : "unknown-" + entry.timestamp;
+      let pair = pairs[idKey];
+
+      if (!pair) {
+        pair = document.createElement("div");
+        pair.className = "pair";
+        pair.innerHTML = `
+          <div class="timestamp">${new Date(entry.timestamp).toLocaleTimeString()}</div>
+          <div class="entry request" id="req-${idKey}"></div>
+          <div class="entry response" id="res-${idKey}"></div>
+        `;
+        logsDiv.prepend(pair);
+        pairs[idKey] = pair;
+      }
+
+      const reqEl = pair.querySelector(`#req-${CSS.escape(idKey)}`);
+      const resEl = pair.querySelector(`#res-${CSS.escape(idKey)}`);
+      const json = prettyJSON(entry.message);
+
+      if (entry.method) {
+        reqEl.textContent = json;
+      } else {
+        resEl.textContent = json;
+      }
+    }
+
+    function normalizeEntry(entry) {
+      if (!entry.timestamp) {
+        entry = {
+          timestamp: new Date().toISOString(),
+          src_ip: "unknown",
+          dst_ip: "unknown",
+          src_port: 0,
+          dst_port: 0,
+          direction: "unknown",
+          message: entry.message || JSON.stringify(entry)
+        };
+      }
+      return entry;
+    }
+
+    // Load old logs
+    fetch("/logs?limit=100")
+      .then((res) => res.json())
+      .then((data) => {
+        data.reverse().forEach((entry) => {
+          const parsed = normalizeEntry(entry);
+          try {
+            const msg = JSON.parse(parsed.message);
+            parsed.method = msg.method || null;
+          } catch {
+            parsed.method = null;
+          }
+          addOrUpdatePair(parsed);
+        });
+      });
+
+    // WebSocket live updates
+    const ws = new WebSocket(`ws://${location.host}/ws`);
+    ws.onmessage = (event) => {
+      let entry = JSON.parse(event.data);
+      entry = normalizeEntry(entry);
+      try {
+        const msg = JSON.parse(entry.message);
+        entry.method = msg.method || null;
+      } catch {
+        entry.method = null;
+      }
+      addOrUpdatePair(entry);
+    };
   </script>
 </body>
 </html>
