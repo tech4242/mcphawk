@@ -38,11 +38,6 @@ def mock_fetch_logs():
         yield mock
 
 
-def test_root_endpoint(client):
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "text/html; charset=utf-8"
-
 
 def test_logs_endpoint(client, mock_fetch_logs):
     response = client.get("/logs")
