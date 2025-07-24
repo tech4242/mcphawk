@@ -3,5 +3,5 @@ coverage:
   status:
     project:
       default:
-        target: 78  # Automatically set coverage target
+        target: 85  # Automatically set coverage target
         threshold: 5% # Allow 5% drop in coverage

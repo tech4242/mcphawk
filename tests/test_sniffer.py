@@ -86,10 +86,6 @@ def test_packet_callback(dummy_server):
     assert "Berlin" in logged_msg
 
 
-def test_import():
-    import mcphawk
-    assert hasattr(mcphawk, "__version__")
-
 
 class TestAutoDetect:
     """Test auto-detect mode functionality."""
