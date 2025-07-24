@@ -2,6 +2,14 @@
 tests/test_logs/
 .claude
 CLAUDE.md
+.DS_Store
+
+# Frontend build output
+mcp_shark/web/static/*
+
+# Node modules
+node_modules/
+frontend/node_modules/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

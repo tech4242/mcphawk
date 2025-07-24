@@ -1,6 +1,7 @@
 # mcp-shark 🦈
 
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Vue.js](https://img.shields.io/badge/vue.js-3.x-brightgreen.svg)](https://vuejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 mcp-shark is a passive sniffer for **Model Context Protocol (MCP)** traffic, similar to Wireshark but MCP-focused.
@@ -52,24 +53,46 @@ If you want to observe all MCP traffic between any processes, mcp-shark offers u
 | Proxy/bridge between client/server            |     ❌     |      ✅       |
 | No client/server config changes required      |     ✅     |      ❌       |
 
-## Running locally
+## Installation
 
-Running locally
+### For Users
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+# Install from PyPI (when published)
+pip install mcp-shark
 
-pip3 install -r requirements-dev.txt
-pip3 install -e .
-
-python3 -m pytest -v
+# Or install directly from GitHub
+pip install git+https://github.com/dazzaji/mcp-shark.git
 ```
 
-## Installing
+### For Developers
 
 ```bash
-pip install mcp-shark
+# Clone the repository
+git clone https://github.com/dazzaji/mcp-shark.git
+cd mcp-shark
+
+# Set up Python environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install backend dependencies
+pip install -r requirements-dev.txt
+pip install -e .
+
+# Install frontend dependencies and build
+cd frontend
+npm install
+npm run build
+cd ..
+
+# Run tests
+python -m pytest -v
+```
+
+## Usage
+
+### Quick Start
 
 # Monitor MCP traffic on a specific port (console output)
 mcp-shark sniff --port 3000
@@ -101,14 +124,36 @@ mcp-shark --help
 # Get help for specific command
 mcp-shark sniff --help
 mcp-shark web --help
+```
 
-# Run dummy mcp server for tests
+### Development Mode
+
+```bash
+# Option 1: Use make (recommended)
+make dev  # Runs both frontend and backend
+
+# Option 2: Run separately
+# Terminal 1 - Frontend with hot reload
+cd frontend && npm run dev
+
+# Terminal 2 - Backend
+mcp-shark web --port 3000
+
+# Option 3: Watch mode
+cd frontend && npm run build:watch  # Auto-rebuild on changes
+mcp-shark web --port 3000           # In another terminal
+```
+
+### Testing with Dummy Server
+
+```bash
+# Run dummy MCP server for testing
 python3 dummy_mcp_server.py
 
-# Run dummy MCP call
+# Send test MCP call
 (echo -n '{"jsonrpc":"2.0","method":"ping"}'; sleep 1) | nc 127.0.0.1 12345
 
-# Test various MCP patterns (after starting dummy server)
+# Generate various MCP patterns
 python3 test_mcp_patterns.py
 ```
 
