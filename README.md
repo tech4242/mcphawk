@@ -130,7 +130,24 @@ mcphawk web --no-sniffer
 
 # Custom web server configuration
 mcphawk web --port 3000 --host 0.0.0.0 --web-port 9000
+
+# Enable debug output for troubleshooting
+mcphawk sniff --port 3000 --debug
+mcphawk web --port 3000 --debug
 ```
+
+### CLI Options
+
+#### Common Options (both commands)
+- `--port` / `-p`: TCP port to monitor
+- `--filter` / `-f`: Custom BPF filter expression
+- `--auto-detect` / `-a`: Auto-detect MCP traffic on any port
+- `--debug` / `-d`: Enable debug output for troubleshooting
+
+#### Web Command Only
+- `--no-sniffer`: Disable sniffer (view historical logs only)
+- `--host`: Web server host (default: 127.0.0.1)
+- `--web-port`: Web server port (default: 8000)
 
 ### Development Mode
 
