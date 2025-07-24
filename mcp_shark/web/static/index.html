@@ -38,6 +38,24 @@
     #controls button.active {
       background: #6a9fb5;
     }
+    #pairingHelp {
+      display: none;
+      text-align: center;
+      padding: 8px;
+      background: #3a3a3a;
+      border-bottom: 1px solid #555;
+      font-size: 13px;
+      color: #aaa;
+    }
+    #pairingHelp.visible {
+      display: block;
+    }
+    #pairingHelp code {
+      background: #444;
+      padding: 2px 4px;
+      border-radius: 3px;
+      color: #569cd6;
+    }
     #stats {
       text-align: center;
       padding: 5px;
@@ -119,14 +137,36 @@
       font-size: 11px;
       color: #666;
     }
-    .paired-indicator {
+    .message.paired {
+      border-left: 4px solid #569cd6;
+      margin-left: 10px;
+    }
+    .pairing-info {
       position: absolute;
-      left: -5px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 3px;
+      top: 5px;
+      right: 5px;
       background: #569cd6;
-      height: 30px;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    .message.paired-request {
+      border-left-color: #6a9fb5;
+    }
+    .message.paired-response {
+      border-left-color: #b58900;
+    }
+    .message.paired-error {
+      border-left-color: #dc322f;
+    }
+    .pairing-line {
+      position: absolute;
+      left: -10px;
+      width: 6px;
+      background: #569cd6;
+      opacity: 0.3;
     }
     .filter-active {
       display: none;
@@ -140,7 +180,11 @@
     <button id="viewRequests">Requests Only</button>
     <button id="viewResponses">Responses Only</button>
     <button id="viewNotifications">Notifications Only</button>
-    <button id="togglePairing">Show Pairing</button>
+    <button id="togglePairing">Show Request/Response Pairs</button>
+  </div>
+  <div id="pairingHelp">
+    Pairing mode: Messages with matching <code>id</code> fields are connected. 
+    Requests and their responses share the same ID in JSON-RPC.
   </div>
   <div id="stats">
     <span id="totalCount">0</span> messages |
@@ -237,21 +281,47 @@
       `;
 
       // Store by ID for pairing visualization
-      if (msgInfo.id !== undefined && showPairing) {
+      if (msgInfo.id !== undefined) {
         if (!messageById.has(msgInfo.id)) {
           messageById.set(msgInfo.id, []);
         }
-        messageById.get(msgInfo.id).push(messageDiv);
+        messageById.get(msgInfo.id).push({ div: messageDiv, type: msgInfo.type });
         
-        // Add pairing indicator if this is the second message with this ID
-        if (messageById.get(msgInfo.id).length > 1) {
-          messageById.get(msgInfo.id).forEach(div => {
-            if (!div.querySelector('.paired-indicator')) {
-              const indicator = document.createElement('div');
-              indicator.className = 'paired-indicator';
-              div.appendChild(indicator);
-            }
-          });
+        // Only apply pairing visualization if showPairing is true
+        if (showPairing) {
+          const pairedMessages = messageById.get(msgInfo.id);
+          if (pairedMessages.length > 1) {
+            // We have a pair! Update all messages with this ID
+            pairedMessages.forEach((msg, index) => {
+              msg.div.classList.add('paired', `paired-${msg.type}`);
+              
+              // Add pairing info badge if not already present
+              if (!msg.div.querySelector('.pairing-info')) {
+                const pairingInfo = document.createElement('div');
+                pairingInfo.className = 'pairing-info';
+                pairingInfo.textContent = `Pair ${msgInfo.id}`;
+                msg.div.appendChild(pairingInfo);
+              }
+              
+              // Update the message header to show pairing
+              const headerDiv = msg.div.querySelector('.message-header > div:first-child');
+              if (headerDiv && !headerDiv.querySelector('.pairing-indicator')) {
+                const indicator = document.createElement('span');
+                indicator.style.marginLeft = '10px';
+                indicator.style.fontSize = '11px';
+                indicator.style.color = '#888';
+                
+                if (pairedMessages.length === 2) {
+                  const otherMsg = pairedMessages[1 - index];
+                  indicator.textContent = `↔ paired with ${otherMsg.type}`;
+                } else {
+                  indicator.textContent = `↔ ${pairedMessages.length} messages`;
+                }
+                indicator.className = 'pairing-indicator';
+                headerDiv.appendChild(indicator);
+              }
+            });
+          }
         }
       }
 
@@ -317,25 +387,64 @@
       showPairing = !showPairing;
       e.target.classList.toggle('active');
       
-      // Re-render all messages to update pairing indicators
-      const messages = Array.from(logsDiv.children);
-      logsDiv.innerHTML = '';
-      messageById.clear();
-      stats.total = stats.request = stats.response = stats.notification = stats.error = stats.unknown = 0;
+      // Show/hide help text
+      document.getElementById('pairingHelp').classList.toggle('visible', showPairing);
       
-      // Re-add all messages
-      messages.forEach(msg => {
-        const entry = {
-          timestamp: msg.querySelector('.timestamp').textContent,
-          message: msg.querySelector('.message-content').textContent,
-          src_ip: 'unknown',
-          dst_ip: 'unknown',
-          src_port: 0,
-          dst_port: 0
-        };
-        const newMsg = createMessageElement(entry);
-        logsDiv.appendChild(newMsg);
+      // Clear existing pairing visualization
+      document.querySelectorAll('.paired').forEach(el => {
+        el.classList.remove('paired', 'paired-request', 'paired-response', 'paired-error');
       });
+      document.querySelectorAll('.pairing-info').forEach(el => el.remove());
+      document.querySelectorAll('.pairing-indicator').forEach(el => el.remove());
+      
+      if (showPairing) {
+        // Re-apply pairing to existing messages
+        messageById.clear();
+        const messages = logsDiv.querySelectorAll('.message');
+        
+        // First pass: collect all messages by ID
+        messages.forEach(msgDiv => {
+          const id = msgDiv.dataset.messageId;
+          const type = msgDiv.dataset.type;
+          if (id && id !== '') {
+            if (!messageById.has(id)) {
+              messageById.set(id, []);
+            }
+            messageById.get(id).push({ div: msgDiv, type: type });
+          }
+        });
+        
+        // Second pass: apply pairing visualization
+        messageById.forEach((pairedMessages, id) => {
+          if (pairedMessages.length > 1) {
+            pairedMessages.forEach((msg, index) => {
+              msg.div.classList.add('paired', `paired-${msg.type}`);
+              
+              const pairingInfo = document.createElement('div');
+              pairingInfo.className = 'pairing-info';
+              pairingInfo.textContent = `Pair ${id}`;
+              msg.div.appendChild(pairingInfo);
+              
+              const headerDiv = msg.div.querySelector('.message-header > div:first-child');
+              if (headerDiv) {
+                const indicator = document.createElement('span');
+                indicator.style.marginLeft = '10px';
+                indicator.style.fontSize = '11px';
+                indicator.style.color = '#888';
+                
+                if (pairedMessages.length === 2) {
+                  const otherMsg = pairedMessages[1 - index];
+                  indicator.textContent = `↔ paired with ${otherMsg.type}`;
+                } else {
+                  indicator.textContent = `↔ ${pairedMessages.length} messages`;
+                }
+                indicator.className = 'pairing-indicator';
+                headerDiv.appendChild(indicator);
+              }
+            });
+          }
+        });
+      }
     });
 
     // Load old logs
