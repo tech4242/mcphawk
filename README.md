@@ -1,8 +1,12 @@
-# MCPHawk 🦅
+<div align="center">
+  <img src="tests/mcphawk_logo.png" alt="MCPHawk Logo" width="130" height="130">
+  
+  # MCPHawk
 
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Vue.js](https://img.shields.io/badge/vue.js-3.x-brightgreen.svg)](https://vuejs.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+  [![Vue.js](https://img.shields.io/badge/vue.js-3.x-brightgreen.svg)](https://vuejs.org/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+</div>
 
 MCPHawk is a passive sniffer for **Model Context Protocol (MCP)** traffic, similar to Wireshark but MCP-focused.
 
@@ -94,6 +98,17 @@ python -m pytest -v
 
 ### Quick Start
 
+```bash
+# Get help
+mcphawk --help
+
+# Get help for specific command
+mcphawk sniff --help
+mcphawk web --help
+
+# Start web UI with auto-detect mode
+mcphawk web --auto-detect
+
 # Monitor MCP traffic on a specific port (console output)
 mcphawk sniff --port 3000
 
@@ -106,9 +121,6 @@ mcphawk sniff --auto-detect
 # Start web UI with sniffer on specific port
 mcphawk web --port 3000
 
-# Start web UI with auto-detect mode
-mcphawk web --auto-detect
-
 # Start web UI with custom filter for multiple ports
 mcphawk web --filter "tcp port 3000 or tcp port 8080"
 
@@ -117,13 +129,6 @@ mcphawk web --no-sniffer
 
 # Custom web server configuration
 mcphawk web --port 3000 --host 0.0.0.0 --web-port 9000
-
-# Get help
-mcphawk --help
-
-# Get help for specific command
-mcphawk sniff --help
-mcphawk web --help
 ```
 
 ### Development Mode
