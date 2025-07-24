@@ -12,6 +12,7 @@ export const useLogStore = defineStore('logs', () => {
   const selectedLogId = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  const expandAll = ref(false)
 
   // Computed
   const filteredLogs = computed(() => {
@@ -126,6 +127,10 @@ export const useLogStore = defineStore('logs', () => {
     showPairing.value = !showPairing.value
   }
 
+  function toggleExpandAll() {
+    expandAll.value = !expandAll.value
+  }
+
   return {
     // State
     logs,
@@ -135,6 +140,7 @@ export const useLogStore = defineStore('logs', () => {
     selectedLogId,
     loading,
     error,
+    expandAll,
     
     // Computed
     filteredLogs,
@@ -149,6 +155,7 @@ export const useLogStore = defineStore('logs', () => {
     selectLog,
     setFilter,
     setSearchQuery,
-    togglePairing
+    togglePairing,
+    toggleExpandAll
   }
 })

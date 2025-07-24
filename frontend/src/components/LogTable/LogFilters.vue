@@ -47,6 +47,21 @@
         <LinkIcon class="h-5 w-5" />
       </button>
 
+      <!-- Expand all -->
+      <button
+        @click="logStore.toggleExpandAll"
+        class="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+        :class="[
+          logStore.expandAll
+            ? 'bg-mcp-blue text-white'
+            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+        ]"
+        :title="logStore.expandAll ? 'Collapse all JSON' : 'Expand all JSON'"
+      >
+        <CodeBracketIcon class="h-5 w-5" />
+        <span class="hidden sm:inline">{{ logStore.expandAll ? 'Collapse' : 'Expand' }}</span>
+      </button>
+
       <!-- Clear logs -->
       <button
         @click="handleClearLogs"
@@ -71,7 +86,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useLogStore } from '@/stores/logs'
-import { MagnifyingGlassIcon, LinkIcon, TrashIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
+import { MagnifyingGlassIcon, LinkIcon, TrashIcon, ArrowPathIcon, CodeBracketIcon } from '@heroicons/vue/24/outline'
 
 const logStore = useLogStore()
 
