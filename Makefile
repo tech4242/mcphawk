@@ -1,10 +1,10 @@
-.PHONY: install install-frontend build build-frontend dev dev-backend dev-frontend test clean
+.PHONY: install install-frontend build build-frontend dev dev-backend dev-frontend test test-watch coverage coverage-report lint format format-unsafe clean
 
 # Install all dependencies
 install: install-backend install-frontend
 
 install-backend:
-	pip install -e .
+	pip3 install -e .
 	pip install -r requirements-dev.txt
 
 install-frontend:
@@ -29,10 +29,18 @@ dev-frontend:
 
 # Testing
 test:
-	python -m pytest -v
+	python3 -m pytest -v
 
 test-watch:
-	python -m pytest -v --watch
+	python3 -m pytest -v --watch
+
+# Coverage
+coverage:
+	python3 -m pytest -v --cov=mcphawk --cov-report=html --cov-report=term
+
+coverage-report:
+	python3 -m pytest -v --cov=mcphawk --cov-report=html --cov-report=term --cov-report=xml
+	@echo "Coverage report generated in htmlcov/index.html"
 
 # Linting
 lint:
