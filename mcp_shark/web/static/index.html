@@ -17,47 +17,159 @@
       padding: 10px;
       margin: 0;
     }
+    #controls {
+      text-align: center;
+      padding: 10px;
+      background: #2b2b2b;
+      border-bottom: 1px solid #555;
+    }
+    #controls button {
+      margin: 0 5px;
+      padding: 5px 15px;
+      background: #444;
+      color: #ddd;
+      border: 1px solid #666;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    #controls button:hover {
+      background: #555;
+    }
+    #controls button.active {
+      background: #6a9fb5;
+    }
+    #stats {
+      text-align: center;
+      padding: 5px;
+      background: #2b2b2b;
+      font-size: 12px;
+      color: #aaa;
+    }
     #logs {
-      max-width: 1000px;
+      max-width: 1200px;
       margin: 10px auto;
       padding: 10px;
     }
-    .pair {
+    .message {
       border: 1px solid #555;
       border-radius: 5px;
       margin-bottom: 10px;
-      padding: 5px 10px;
+      padding: 10px;
       background-color: #2b2b2b;
+      position: relative;
+    }
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .message-type {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .type-request {
+      background: #6a9fb5;
+      color: #fff;
+    }
+    .type-response {
+      background: #b58900;
+      color: #fff;
+    }
+    .type-notification {
+      background: #b5546a;
+      color: #fff;
+    }
+    .type-error {
+      background: #dc322f;
+      color: #fff;
+    }
+    .type-unknown {
+      background: #586e75;
+      color: #fff;
+    }
+    .message-info {
+      font-size: 12px;
+      color: #888;
     }
     .timestamp {
       color: #aaa;
       font-size: 12px;
-      margin-bottom: 4px;
     }
-    .entry {
-      margin: 4px 0;
-      padding: 4px;
+    .message-id {
+      color: #569cd6;
+      font-size: 11px;
+      margin-left: 10px;
+    }
+    .message-content {
       background-color: #1e1e1e;
       border: 1px solid #444;
       border-radius: 3px;
+      padding: 8px;
       white-space: pre-wrap;
       overflow-x: auto;
+      font-size: 13px;
     }
-    .request {
-      border-left: 3px solid #6a9fb5;
+    .message-meta {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #666;
     }
-    .response {
-      border-left: 3px solid #b58900;
+    .paired-indicator {
+      position: absolute;
+      left: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      background: #569cd6;
+      height: 30px;
+    }
+    .filter-active {
+      display: none;
     }
   </style>
 </head>
 <body>
   <h1>MCP-Shark Live Logs</h1>
+  <div id="controls">
+    <button id="viewAll" class="active">All Messages</button>
+    <button id="viewRequests">Requests Only</button>
+    <button id="viewResponses">Responses Only</button>
+    <button id="viewNotifications">Notifications Only</button>
+    <button id="togglePairing">Show Pairing</button>
+  </div>
+  <div id="stats">
+    <span id="totalCount">0</span> messages |
+    <span id="requestCount">0</span> requests |
+    <span id="responseCount">0</span> responses |
+    <span id="notificationCount">0</span> notifications
+  </div>
   <div id="logs"></div>
 
   <script>
     const logsDiv = document.getElementById("logs");
-    const pairs = {};
+    const messageById = new Map(); // Track messages by their JSON-RPC id
+    const stats = {
+      total: 0,
+      request: 0,
+      response: 0,
+      notification: 0,
+      error: 0,
+      unknown: 0
+    };
+    let currentFilter = 'all';
+    let showPairing = false;
+
+    function updateStats() {
+      document.getElementById('totalCount').textContent = stats.total;
+      document.getElementById('requestCount').textContent = stats.request;
+      document.getElementById('responseCount').textContent = stats.response;
+      document.getElementById('notificationCount').textContent = stats.notification;
+    }
 
     function prettyJSON(obj) {
       try {
@@ -68,31 +180,93 @@
       }
     }
 
-    function addOrUpdatePair(entry) {
-      const idKey = entry.method ? entry.method + "-" + entry.timestamp : "unknown-" + entry.timestamp;
-      let pair = pairs[idKey];
+    function detectMessageType(msg) {
+      try {
+        const parsed = typeof msg === 'string' ? JSON.parse(msg) : msg;
+        
+        // JSON-RPC 2.0 detection
+        if (parsed.method && parsed.id !== undefined) {
+          return { type: 'request', id: parsed.id, method: parsed.method };
+        } else if (parsed.method && parsed.id === undefined) {
+          return { type: 'notification', method: parsed.method };
+        } else if ((parsed.result !== undefined || parsed.error !== undefined) && parsed.id !== undefined) {
+          return { type: parsed.error ? 'error' : 'response', id: parsed.id };
+        }
+        
+        return { type: 'unknown' };
+      } catch {
+        return { type: 'unknown' };
+      }
+    }
 
-      if (!pair) {
-        pair = document.createElement("div");
-        pair.className = "pair";
-        pair.innerHTML = `
+    function formatDirection(entry) {
+      return `${entry.src_ip}:${entry.src_port} → ${entry.dst_ip}:${entry.dst_port}`;
+    }
+
+    function createMessageElement(entry) {
+      const msgInfo = detectMessageType(entry.message);
+      stats[msgInfo.type]++;
+      stats.total++;
+      updateStats();
+
+      const messageDiv = document.createElement("div");
+      messageDiv.className = `message ${currentFilter !== 'all' && !messageDiv.classList.contains(`filter-${currentFilter}`) ? 'filter-active' : ''}`;
+      messageDiv.dataset.type = msgInfo.type;
+      messageDiv.dataset.messageId = msgInfo.id || '';
+      
+      let typeLabel = msgInfo.type;
+      let extraInfo = '';
+      
+      if (msgInfo.method) {
+        extraInfo = ` - ${msgInfo.method}`;
+      }
+      if (msgInfo.id !== undefined) {
+        extraInfo += `<span class="message-id">ID: ${msgInfo.id}</span>`;
+      }
+
+      messageDiv.innerHTML = `
+        <div class="message-header">
+          <div>
+            <span class="message-type type-${msgInfo.type}">${typeLabel}</span>
+            ${extraInfo}
+          </div>
           <div class="timestamp">${new Date(entry.timestamp).toLocaleTimeString()}</div>
-          <div class="entry request" id="req-${idKey}"></div>
-          <div class="entry response" id="res-${idKey}"></div>
-        `;
-        logsDiv.prepend(pair);
-        pairs[idKey] = pair;
+        </div>
+        <div class="message-content">${prettyJSON(entry.message)}</div>
+        <div class="message-meta">${formatDirection(entry)}</div>
+      `;
+
+      // Store by ID for pairing visualization
+      if (msgInfo.id !== undefined && showPairing) {
+        if (!messageById.has(msgInfo.id)) {
+          messageById.set(msgInfo.id, []);
+        }
+        messageById.get(msgInfo.id).push(messageDiv);
+        
+        // Add pairing indicator if this is the second message with this ID
+        if (messageById.get(msgInfo.id).length > 1) {
+          messageById.get(msgInfo.id).forEach(div => {
+            if (!div.querySelector('.paired-indicator')) {
+              const indicator = document.createElement('div');
+              indicator.className = 'paired-indicator';
+              div.appendChild(indicator);
+            }
+          });
+        }
       }
 
-      const reqEl = pair.querySelector(`#req-${CSS.escape(idKey)}`);
-      const resEl = pair.querySelector(`#res-${CSS.escape(idKey)}`);
-      const json = prettyJSON(entry.message);
+      return messageDiv;
+    }
 
-      if (entry.method) {
-        reqEl.textContent = json;
-      } else {
-        resEl.textContent = json;
-      }
+    function applyFilter() {
+      const messages = logsDiv.querySelectorAll('.message');
+      messages.forEach(msg => {
+        if (currentFilter === 'all') {
+          msg.style.display = 'block';
+        } else {
+          msg.style.display = msg.dataset.type === currentFilter ? 'block' : 'none';
+        }
+      });
     }
 
     function normalizeEntry(entry) {
@@ -110,20 +284,70 @@
       return entry;
     }
 
+    // Control buttons
+    document.getElementById('viewAll').addEventListener('click', (e) => {
+      currentFilter = 'all';
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      applyFilter();
+    });
+
+    document.getElementById('viewRequests').addEventListener('click', (e) => {
+      currentFilter = 'request';
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      applyFilter();
+    });
+
+    document.getElementById('viewResponses').addEventListener('click', (e) => {
+      currentFilter = 'response';
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      applyFilter();
+    });
+
+    document.getElementById('viewNotifications').addEventListener('click', (e) => {
+      currentFilter = 'notification';
+      document.querySelectorAll('#controls button').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+      applyFilter();
+    });
+
+    document.getElementById('togglePairing').addEventListener('click', (e) => {
+      showPairing = !showPairing;
+      e.target.classList.toggle('active');
+      
+      // Re-render all messages to update pairing indicators
+      const messages = Array.from(logsDiv.children);
+      logsDiv.innerHTML = '';
+      messageById.clear();
+      stats.total = stats.request = stats.response = stats.notification = stats.error = stats.unknown = 0;
+      
+      // Re-add all messages
+      messages.forEach(msg => {
+        const entry = {
+          timestamp: msg.querySelector('.timestamp').textContent,
+          message: msg.querySelector('.message-content').textContent,
+          src_ip: 'unknown',
+          dst_ip: 'unknown',
+          src_port: 0,
+          dst_port: 0
+        };
+        const newMsg = createMessageElement(entry);
+        logsDiv.appendChild(newMsg);
+      });
+    });
+
     // Load old logs
     fetch("/logs?limit=100")
       .then((res) => res.json())
       .then((data) => {
         data.reverse().forEach((entry) => {
           const parsed = normalizeEntry(entry);
-          try {
-            const msg = JSON.parse(parsed.message);
-            parsed.method = msg.method || null;
-          } catch {
-            parsed.method = null;
-          }
-          addOrUpdatePair(parsed);
+          const messageEl = createMessageElement(parsed);
+          logsDiv.prepend(messageEl);
         });
+        applyFilter();
       });
 
     // WebSocket live updates
@@ -131,13 +355,9 @@
     ws.onmessage = (event) => {
       let entry = JSON.parse(event.data);
       entry = normalizeEntry(entry);
-      try {
-        const msg = JSON.parse(entry.message);
-        entry.method = msg.method || null;
-      } catch {
-        entry.method = null;
-      }
-      addOrUpdatePair(entry);
+      const messageEl = createMessageElement(entry);
+      logsDiv.prepend(messageEl);
+      applyFilter();
     };
   </script>
 </body>
