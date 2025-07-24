@@ -6,7 +6,12 @@ Cross-platform: works on macOS (loopback) and Linux.
 import asyncio
 from datetime import UTC, datetime
 import json
+import logging
 import platform
+
+# Suppress Scapy warnings before importing
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+
 from scapy.all import sniff, IP, TCP, Raw, conf
 from mcp_shark.logger import log_message
 from mcp_shark.web.broadcaster import broadcast_new_log

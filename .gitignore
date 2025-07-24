@@ -1,5 +1,7 @@
 *.db
 tests/test_logs/
+.claude
+CLAUDE.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
