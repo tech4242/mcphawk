@@ -1,8 +1,6 @@
 <div align="center">
-  <img src="tests/mcphawk_logo.png" alt="MCPHawk Logo" width="130" height="130">
+  <img src="tests/mcphawk_logo.png" alt="MCPHawk Logo" height="130">
   
-  # MCPHawk
-
   [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
   [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
   [![Vue.js](https://img.shields.io/badge/vue.js-3.x-brightgreen.svg)](https://vuejs.org/)
