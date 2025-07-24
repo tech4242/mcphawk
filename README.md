@@ -19,11 +19,17 @@ No proxying or protocol injection—just observes real traffic.
   - Responses (result/error + id)
   - Notifications (method without id)
   - Error responses
+- **Auto-detect mode** - automatically discovers MCP traffic on any port without prior configuration
+- **Flexible traffic filtering**:
+  - Monitor specific ports with `--port`
+  - Use custom BPF filters with `--filter`
+  - Auto-detect MCP traffic on all ports with `--auto-detect`
 - **Chronological message display** - messages shown in order as captured
 - **Message filtering** - view all, requests only, responses only, or notifications only
 - **Optional ID-based pairing visualization** - see which requests and responses belong together
 - **Real-time statistics** - message counts by type
 - **Console-only mode** - use `mcp-shark sniff` for terminal output without web UI
+- **Historical log viewing** - use `mcp-shark web --no-sniffer` to view past captures without active sniffing
 
 ## mcpinspector vs. mcp-shark
 
@@ -32,6 +38,7 @@ If you want to observe all MCP traffic between any processes, mcp-shark offers u
 | Feature                                      | mcp-shark | mcpinspector |
 |-----------------------------------------------|:---------:|:------------:|
 | Passive sniffing (no proxy needed)            |     ✅     |      ❌       |
+| Auto-detect MCP traffic on any port           |     ✅     |      ❌       |
 | Web UI for live/historical traffic            |     ✅     |      ✅       |
 | Can capture any traffic (not just via proxy)  |     ✅     |      ❌       |
 | JSON-RPC message type detection               |     ✅     |      ❌       |
@@ -61,20 +68,29 @@ python3 -m pytest -v
 ```bash
 pip install mcp-shark
 
-# Basic sniffing (console output only)
-mcp-shark sniff
+# Monitor MCP traffic on a specific port (console output)
+mcp-shark sniff --port 3000
 
-# Sniff with a custom filter
-mcp-shark sniff --filter "tcp port 8080"
+# Monitor multiple ports with a custom filter
+mcp-shark sniff --filter "tcp port 3000 or tcp port 8080"
 
-# Start web UI with sniffer
-mcp-shark web
+# Auto-detect MCP traffic on any port
+mcp-shark sniff --auto-detect
 
-# Start web UI without sniffer (view historical logs only)
+# Start web UI with sniffer on specific port
+mcp-shark web --port 3000
+
+# Start web UI with auto-detect mode
+mcp-shark web --auto-detect
+
+# Start web UI with custom filter for multiple ports
+mcp-shark web --filter "tcp port 3000 or tcp port 8080"
+
+# View historical logs only (no active sniffing)
 mcp-shark web --no-sniffer
 
-# Start web UI on custom host/port
-mcp-shark web --host 0.0.0.0 --port 9000
+# Custom web server configuration
+mcp-shark web --port 3000 --host 0.0.0.0 --web-port 9000
 
 # Get help
 mcp-shark --help
@@ -92,3 +108,19 @@ python3 dummy_mcp_server.py
 # Test various MCP patterns (after starting dummy server)
 python3 test_mcp_patterns.py
 ```
+
+## Potential Upcoming Features
+
+Vote for features by opening a GitHub issue!
+
+- [x] **Auto-detect MCP traffic** - Automatically discover MCP traffic on any port without prior configuration
+- [ ] **Protocol Version Detection** - Identify and display MCP protocol version from captured traffic
+- [ ] **Smart Search & Filtering** - Search by method name, params, or any JSON field with regex support
+- [ ] **Performance Analytics** - Request/response timing, method frequency charts, and latency distribution
+- [ ] **Export & Share** - Export sessions as JSON/CSV, generate shareable links, create HAR-like files
+- [ ] **Test Generation** - Auto-generate test cases from captured traffic
+- [ ] **Error Analysis** - Highlight errors, group similar issues, show error trends
+- [ ] **Session Management** - Save/load capture sessions, compare sessions side-by-side
+- [ ] **Interactive Replay** - Click any request to re-send it, edit and replay captured messages
+- [ ] **Real-time Alerts** - Alert on specific methods or error patterns with webhook support
+- [ ] **Visualization** - Sequence diagrams, resource heat maps, method dependency graphs

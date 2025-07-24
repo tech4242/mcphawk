@@ -35,6 +35,9 @@ def _broadcast_in_any_loop(log_entry: dict) -> None:
         asyncio.run(_safe_broadcast(log_entry))
 
 
+# Global variable to track auto-detect mode
+_auto_detect_mode = False
+
 def packet_callback(pkt):
     """
     Callback for every sniffed packet.
@@ -42,7 +45,7 @@ def packet_callback(pkt):
     """
     if pkt.haslayer(Raw):
         raw_payload = pkt[Raw].load
-        if DEBUG:
+        if DEBUG and not _auto_detect_mode:  # Less verbose in auto-detect mode
             print(f"[DEBUG] Raw payload: {raw_payload[:60]}...")
 
         try:
@@ -52,12 +55,19 @@ def packet_callback(pkt):
                     print(f"[DEBUG] Sniffer captured: {decoded}")
 
                 ts = datetime.now(tz=UTC)
+                src_port = pkt[TCP].sport if pkt.haslayer(TCP) else 0
+                dst_port = pkt[TCP].dport if pkt.haslayer(TCP) else 0
+                
+                # In auto-detect mode, log when we find MCP traffic on a new port
+                if _auto_detect_mode:
+                    print(f"[MCP-Shark] Detected MCP traffic on port {src_port} -> {dst_port}")
+                
                 entry = {
                     "timestamp": ts,
                     "src_ip": pkt[IP].src if pkt.haslayer(IP) else "",
-                    "src_port": pkt[TCP].sport if pkt.haslayer(TCP) else 0,
+                    "src_port": src_port,
                     "dst_ip": pkt[IP].dst if pkt.haslayer(IP) else "",
-                    "dst_port": pkt[TCP].dport if pkt.haslayer(TCP) else 0,
+                    "dst_port": dst_port,
                     "direction": "unknown",
                     "message": decoded,
                 }
@@ -73,14 +83,23 @@ def packet_callback(pkt):
                 print(f"[DEBUG] JSON decode failed: {e}")
 
 
-def start_sniffer(filter_expr: str = "tcp and port 12345") -> None:
+def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = False) -> None:
     """
     Start sniffing packets on the appropriate interface.
     - On macOS: use `lo0`
     - On Linux: default interface
+    
+    Args:
+        filter_expr: BPF filter expression
+        auto_detect: If True, automatically detect MCP traffic on any port
     """
+    global _auto_detect_mode
+    _auto_detect_mode = auto_detect
+    
     if DEBUG:
         print(f"[DEBUG] Starting sniffer with filter: {filter_expr}")
+        if auto_detect:
+            print("[DEBUG] Auto-detect mode enabled")
 
     # Ensure better pcap support on macOS
     conf.use_pcap = True

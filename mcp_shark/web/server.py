@@ -90,22 +90,26 @@ async def websocket_endpoint(websocket: WebSocket):
             print(f"[DEBUG] WebSocket disconnected: {len(active_clients)} active clients")
 
 
-def _start_sniffer_thread():
+def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False):
     """
     Start the sniffer in a dedicated daemon thread.
+    
+    Args:
+        filter_expr: BPF filter expression for the sniffer.
+        auto_detect: Whether to auto-detect MCP traffic.
     """
     from mcp_shark.sniffer import start_sniffer
 
     def safe_start():
         if DEBUG:
-            print("[DEBUG] Sniffer thread starting...")
-        return start_sniffer()
+            print(f"[DEBUG] Sniffer thread starting with filter: {filter_expr}, auto_detect: {auto_detect}")
+        return start_sniffer(filter_expr=filter_expr, auto_detect=auto_detect)
 
     thread = threading.Thread(target=safe_start, daemon=True)
     thread.start()
 
 
-def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000):
+def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: str = None, auto_detect: bool = False):
     """
     Run the web server and optionally the sniffer.
 
@@ -113,11 +117,21 @@ def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000):
         sniffer: Whether to start the sniffer in a background thread.
         host: Host to bind the server to.
         port: Port to run the server on.
+        filter_expr: BPF filter expression for the sniffer.
+        auto_detect: Whether to auto-detect MCP traffic.
     """
     if sniffer:
-        _start_sniffer_thread()
+        if not filter_expr:
+            raise ValueError("filter_expr is required when sniffer is enabled")
+        _start_sniffer_thread(filter_expr, auto_detect)
 
-    print(f"[MCP-Shark] Starting sniffer and dashboard on http://{host}:{port}")
+    if sniffer:
+        print(f"[MCP-Shark] Starting sniffer and dashboard on http://{host}:{port}")
+        print(f"[MCP-Shark] Using filter: {filter_expr}")
+        if auto_detect:
+            print("[MCP-Shark] Auto-detect mode enabled")
+    else:
+        print(f"[MCP-Shark] Starting dashboard only (no sniffer) on http://{host}:{port}")
 
     import uvicorn
     uvicorn.run(app, host=host, port=port)

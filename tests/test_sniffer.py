@@ -7,8 +7,9 @@ import pytest
 from scapy.layers.inet import IP, TCP
 from scapy.packet import Raw
 from scapy.all import Ether
-from mcp_shark.sniffer import packet_callback
+from mcp_shark.sniffer import packet_callback, start_sniffer
 from mcp_shark.logger import init_db, set_db_path
+from unittest.mock import patch, MagicMock
 
 # --- TEST DB PATH ---
 TEST_DB_DIR = "tests/test_logs"
@@ -86,3 +87,82 @@ def test_packet_callback(dummy_server):
 def test_import():
     import mcp_shark
     assert hasattr(mcp_shark, "__version__")
+
+
+class TestAutoDetect:
+    """Test auto-detect mode functionality."""
+    
+    def setup_method(self):
+        """Reset global state before each test."""
+        import mcp_shark.sniffer
+        mcp_shark.sniffer._auto_detect_mode = False
+    
+    @patch('mcp_shark.sniffer.log_message')
+    @patch('mcp_shark.sniffer._broadcast_in_any_loop')
+    @patch('builtins.print')
+    def test_auto_detect_prints_port_info(self, mock_print, mock_broadcast, mock_log):
+        """Test that auto-detect mode prints port information when MCP traffic is found."""
+        import mcp_shark.sniffer
+        mcp_shark.sniffer._auto_detect_mode = True
+        
+        # Create a mock packet with MCP JSON-RPC
+        mock_pkt = MagicMock()
+        mock_pkt.haslayer.side_effect = lambda layer: layer in [Raw, IP, TCP]
+        mock_pkt.__getitem__.side_effect = lambda layer: {
+            Raw: MagicMock(load=b'{"jsonrpc":"2.0","method":"test","id":1}'),
+            IP: MagicMock(src="10.0.0.1", dst="10.0.0.2"),
+            TCP: MagicMock(sport=54321, dport=3000)
+        }[layer]
+        
+        packet_callback(mock_pkt)
+        
+        # Check that port detection message was printed
+        mock_print.assert_any_call("[MCP-Shark] Detected MCP traffic on port 54321 -> 3000")
+        
+        # Verify log_message was called
+        assert mock_log.called
+        logged_entry = mock_log.call_args[0][0]
+        assert logged_entry["src_port"] == 54321
+        assert logged_entry["dst_port"] == 3000
+        assert "test" in logged_entry["message"]
+    
+    @patch('mcp_shark.sniffer.log_message')
+    @patch('mcp_shark.sniffer._broadcast_in_any_loop')
+    @patch('builtins.print')
+    def test_non_auto_detect_no_port_print(self, mock_print, mock_broadcast, mock_log):
+        """Test that port info is not printed when not in auto-detect mode."""
+        import mcp_shark.sniffer
+        mcp_shark.sniffer._auto_detect_mode = False
+        
+        mock_pkt = MagicMock()
+        mock_pkt.haslayer.side_effect = lambda layer: layer in [Raw, IP, TCP]
+        mock_pkt.__getitem__.side_effect = lambda layer: {
+            Raw: MagicMock(load=b'{"jsonrpc":"2.0","method":"test","id":1}'),
+            IP: MagicMock(src="10.0.0.1", dst="10.0.0.2"),
+            TCP: MagicMock(sport=3000, dport=54321)
+        }[layer]
+        
+        packet_callback(mock_pkt)
+        
+        # Should not print port detection message
+        for call_args in mock_print.call_args_list:
+            assert "[MCP-Shark] Detected MCP traffic on port" not in str(call_args)
+    
+    @patch('mcp_shark.sniffer.sniff')
+    @patch('builtins.print')
+    def test_start_sniffer_auto_detect_flag(self, mock_print, mock_sniff):
+        """Test that start_sniffer sets auto_detect mode and uses correct filter."""
+        start_sniffer(filter_expr="tcp", auto_detect=True)
+        
+        # Check that auto_detect mode was enabled
+        import mcp_shark.sniffer
+        assert mcp_shark.sniffer._auto_detect_mode == True
+        
+        # Check debug messages
+        mock_print.assert_any_call("[DEBUG] Starting sniffer with filter: tcp")
+        mock_print.assert_any_call("[DEBUG] Auto-detect mode enabled")
+        
+        # Check sniff was called with tcp filter
+        mock_sniff.assert_called_once()
+        call_kwargs = mock_sniff.call_args[1]
+        assert call_kwargs["filter"] == "tcp"
