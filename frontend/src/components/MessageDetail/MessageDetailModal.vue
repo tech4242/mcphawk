@@ -73,6 +73,15 @@
                   </div>
                 </div>
 
+                <!-- Paired Messages -->
+                <PairedMessages 
+                  v-if="logStore.selectedLog"
+                  :current-log="logStore.selectedLog" 
+                  :all-logs="logStore.logs" 
+                  variant="full" 
+                  class="mt-4"
+                />
+
                 <!-- Actions -->
                 <div class="flex justify-end gap-2 mt-6">
                   <button
@@ -104,6 +113,7 @@ import { ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
 import { useLogStore } from '@/stores/logs'
 import { getMessageType, parseMessage } from '@/utils/messageParser'
 import MessageTypeBadge from '@/components/LogTable/MessageTypeBadge.vue'
+import PairedMessages from '@/components/common/PairedMessages.vue'
 
 const logStore = useLogStore()
 const copied = ref(false)

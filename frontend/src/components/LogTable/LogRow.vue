@@ -2,10 +2,9 @@
   <tr>
     <td colspan="5" class="p-0">
       <div 
-        class="cursor-pointer transition-colors"
+        class="cursor-pointer transition-all relative"
         :class="{
-          'bg-blue-50 dark:bg-blue-900/20': isSelected,
-          'ring-2 ring-blue-400 ring-opacity-50': isPaired && !isSelected,
+          'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-500': isSelected,
           'hover:bg-gray-50 dark:hover:bg-gray-700/50': !isSelected
         }"
         @click="$emit('click')"
@@ -35,8 +34,17 @@
         </table>
       </div>
       <!-- Expanded JSON view -->
-      <div v-if="isExpanded" class="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-        <pre class="text-xs font-mono text-gray-800 dark:text-gray-200 overflow-x-auto">{{ formattedJson }}</pre>
+      <div v-if="isExpanded" class="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+        <div class="px-4 py-3">
+          <pre class="text-xs font-mono text-gray-800 dark:text-gray-200 overflow-x-auto">{{ formattedJson }}</pre>
+        </div>
+        
+        <!-- Paired messages -->
+        <PairedMessages 
+          :current-log="log" 
+          :all-logs="allLogs" 
+          variant="compact" 
+        />
       </div>
     </td>
   </tr>
@@ -46,17 +54,18 @@
 import { computed } from 'vue'
 import { getMessageType, getMessageSummary, formatTimestamp, getPortInfo, getDirectionIcon } from '@/utils/messageParser'
 import MessageTypeBadge from './MessageTypeBadge.vue'
+import PairedMessages from '@/components/common/PairedMessages.vue'
 
 const props = defineProps({
   log: {
     type: Object,
     required: true
   },
-  isSelected: {
-    type: Boolean,
-    default: false
+  allLogs: {
+    type: Array,
+    default: () => []
   },
-  isPaired: {
+  isSelected: {
     type: Boolean,
     default: false
   },
@@ -81,4 +90,5 @@ const formattedJson = computed(() => {
     return props.log.message
   }
 })
+
 </script>

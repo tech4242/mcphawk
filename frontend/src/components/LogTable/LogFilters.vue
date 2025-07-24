@@ -33,20 +33,6 @@
         <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
       </div>
 
-      <!-- Toggle pairing -->
-      <button
-        @click="logStore.togglePairing"
-        class="px-4 py-2 rounded-lg font-medium transition-colors"
-        :class="[
-          logStore.showPairing
-            ? 'bg-mcp-blue text-white'
-            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-        ]"
-        title="Show request/response pairs"
-      >
-        <LinkIcon class="h-5 w-5" />
-      </button>
-
       <!-- Expand all -->
       <button
         @click="logStore.toggleExpandAll"
@@ -86,7 +72,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useLogStore } from '@/stores/logs'
-import { MagnifyingGlassIcon, LinkIcon, TrashIcon, ArrowPathIcon, CodeBracketIcon } from '@heroicons/vue/24/outline'
+import { MagnifyingGlassIcon, TrashIcon, ArrowPathIcon, CodeBracketIcon } from '@heroicons/vue/24/outline'
 
 const logStore = useLogStore()
 

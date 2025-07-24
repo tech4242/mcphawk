@@ -32,8 +32,8 @@
             v-for="log in displayLogs"
             :key="log.id || `${log.timestamp}-${log.src_port}`"
             :log="log"
+            :all-logs="logStore.logs"
             :is-selected="logStore.selectedLogId === log.id"
-            :is-paired="logStore.pairedLogs.has(log.id)"
             :is-expanded="logStore.expandAll"
             @click="handleLogClick(log)"
           />
