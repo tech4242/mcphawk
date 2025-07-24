@@ -1,4 +1,4 @@
-from mcp_shark.ws_reassembly import process_ws_packet
+from mcphawk.ws_reassembly import process_ws_packet
 
 # Connection identifiers for test
 SRC_IP, SRC_PORT = "127.0.0.1", 11111

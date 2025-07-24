@@ -1,9 +1,3 @@
-"""
-WebSocket broadcasting utility for MCP-Shark.
-
-Broadcasts full log entries to all connected WebSocket clients.
-"""
-
 from typing import List, Dict, Any
 from fastapi import WebSocket
 

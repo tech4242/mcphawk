@@ -10,7 +10,7 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: '../mcp_shark/web/static',
+    outDir: '../mcphawk/web/static',
     emptyOutDir: true,
     rollupOptions: {
       output: {

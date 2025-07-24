@@ -9,10 +9,10 @@ This ensures:
 import json
 import os
 from scapy.all import Ether, IP, TCP, Raw
-from mcp_shark.sniffer import packet_callback
-from mcp_shark.logger import set_db_path, init_db, clear_logs, fetch_logs
+from mcphawk.sniffer import packet_callback
+from mcphawk.logger import set_db_path, init_db, clear_logs, fetch_logs
 
-TEST_DB = "test_mcp_shark_logs.db"
+TEST_DB = "test_mcphawk_logs.db"
 
 
 def setup_module(module):

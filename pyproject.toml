@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mcp-shark"
+name = "mcphawk"
 version = "0.1.0"
 description = "A passive MCP (Model Context Protocol) traffic sniffer for WebSocket-based MCP servers."
 authors = [
@@ -19,8 +19,11 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/tech4242/mcp-shark"
-"Bug Tracker" = "https://github.com/tech4242/mcp-shark/issues"
+"Homepage" = "https://github.com/tech4242/mcphawk"
+"Bug Tracker" = "https://github.com/tech4242/mcphawk/issues"
 
 [project.scripts]
-mcp-shark = "mcp_shark.cli:app"
+mcphawk = "mcphawk.cli:app"
+
+[tool.setuptools]
+packages = ["mcphawk", "mcphawk.web"]

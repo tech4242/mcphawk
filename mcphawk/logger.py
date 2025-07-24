@@ -1,29 +1,10 @@
-"""
-logger.py - MCP-Shark Logging Module
-
-Handles persistent logging of MCP-like messages, fully aligned with
-the MCPMessageLog TypedDict schema.
-
-Schema:
-    logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        src_ip TEXT,
-        dst_ip TEXT,
-        src_port INTEGER,
-        dst_port INTEGER,
-        direction TEXT CHECK(direction IN ('incoming', 'outgoing', 'unknown')),
-        message TEXT
-    )
-"""
-
 import sqlite3
 from pathlib import Path
 from datetime import datetime, UTC
 from typing import List, Dict, Any
 
 # Database file (shared with tests)
-DB_FILE = "mcp_shark_logs.db"
+DB_FILE = "mcphawk_logs.db"
 _DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / DB_FILE
 DB_PATH = _DEFAULT_DB_PATH
 

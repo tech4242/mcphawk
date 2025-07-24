@@ -1,5 +1,5 @@
 """
-Test suite for MCP-Shark Web API and WebSocket (Phase 1.6 Final).
+Test suite for MCPHawk Web API and WebSocket (Phase 1.6 Final).
 
 Covers:
 - REST API for fetching logs
@@ -12,16 +12,16 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from mcp_shark.logger import log_message, set_db_path, init_db
-from mcp_shark.web.server import app
-from mcp_shark.web.broadcaster import broadcast_new_log
+from mcphawk.logger import log_message, set_db_path, init_db
+from mcphawk.web.server import app
+from mcphawk.web.broadcaster import broadcast_new_log
 import os
 import tempfile
 
 client = TestClient(app)
 
 # Use a temporary test database
-TEST_DB_PATH = os.path.join(tempfile.gettempdir(), "test_web_mcp_shark.db")
+TEST_DB_PATH = os.path.join(tempfile.gettempdir(), "test_web_mcphawk.db")
 
 
 @pytest.fixture(autouse=True, scope="module")

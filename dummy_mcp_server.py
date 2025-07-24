@@ -3,7 +3,7 @@ import threading
 import json
 
 HOST = "127.0.0.1"
-PORT = 12345  # MCP-Shark should sniff this port
+PORT = 12345  # MCPHawk should sniff this port
 
 
 def handle_client(conn, addr):

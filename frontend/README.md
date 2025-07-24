@@ -1,6 +1,6 @@
-# MCP Shark Frontend
+# MCPHawk Frontend
 
-Modern Vue 3 frontend for MCP Shark - a passive network sniffer for Model Context Protocol traffic.
+Modern Vue 3 frontend for MCPHawk - a passive network sniffer for Model Context Protocol traffic.
 
 ## Tech Stack
 
@@ -26,7 +26,7 @@ npm install
 # Start development server (runs on http://localhost:5173)
 npm run dev
 
-# Build for production (outputs to ../mcp_shark/web/static)
+# Build for production (outputs to ../mcphawk/web/static)
 npm run build
 ```
 

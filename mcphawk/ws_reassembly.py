@@ -1,10 +1,3 @@
-"""
-Passive WebSocket reassembly for MCP-Shark.
-
-This version does not rely on wsproto and instead reassembles
-WebSocket frames manually for passive sniffing scenarios.
-"""
-
 from typing import Dict, Tuple, List
 
 

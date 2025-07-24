@@ -5,7 +5,7 @@ CLAUDE.md
 .DS_Store
 
 # Frontend build output
-mcp_shark/web/static/*
+mcphawk/web/static/*
 
 # Node modules
 node_modules/

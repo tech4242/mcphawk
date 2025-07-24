@@ -2,11 +2,11 @@ import pytest
 import os
 import tempfile
 from fastapi.testclient import TestClient
-from mcp_shark.web.server import app
-from mcp_shark.logger import init_db, set_db_path
+from mcphawk.web.server import app
+from mcphawk.logger import init_db, set_db_path
 
 # Use a separate test database for this module
-TEST_DB_PATH = os.path.join(tempfile.gettempdir(), "test_server_mcp_shark.db")
+TEST_DB_PATH = os.path.join(tempfile.gettempdir(), "test_server_mcphawk.db")
 
 
 @pytest.fixture(scope="module")

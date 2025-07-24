@@ -1,12 +1,12 @@
-# mcp-shark 🦈
+# MCPHawk 🦅
 
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Vue.js](https://img.shields.io/badge/vue.js-3.x-brightgreen.svg)](https://vuejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-mcp-shark is a passive sniffer for **Model Context Protocol (MCP)** traffic, similar to Wireshark but MCP-focused.
+MCPHawk is a passive sniffer for **Model Context Protocol (MCP)** traffic, similar to Wireshark but MCP-focused.
 
-It captures JSON-RPC traffic between MCP clients and WebSocket/TCP-based MCP servers. MCP-Shark can reconstruct full JSON-RPC messages from raw TCP traffic without requiring a handshake.
+It captures JSON-RPC traffic between MCP clients and WebSocket/TCP-based MCP servers. MCPHawk can reconstruct full JSON-RPC messages from raw TCP traffic without requiring a handshake.
 
 ## What it is
 Passive network sniffer for MCP/JSON-RPC traffic (like Wireshark, but protocol-focused).
@@ -32,14 +32,14 @@ No proxying or protocol injection—just observes real traffic.
 - **Message filtering** - view all, requests only, responses only, or notifications only
 - **Optional ID-based pairing visualization** - see which requests and responses belong together
 - **Real-time statistics** - message counts by type
-- **Console-only mode** - use `mcp-shark sniff` for terminal output without web UI
-- **Historical log viewing** - use `mcp-shark web --no-sniffer` to view past captures without active sniffing
+- **Console-only mode** - use `mcphawk sniff` for terminal output without web UI
+- **Historical log viewing** - use `mcphawk web --no-sniffer` to view past captures without active sniffing
 
-## mcpinspector vs. mcp-shark
+## mcpinspector vs. MCPHawk
 
-If you want to observe all MCP traffic between any processes, mcp-shark offers unique value as a passive sniffer that mcpinspector does not. If you want to actively test servers, mcpinspector is better. For many workflows, they are complementary tools.
+If you want to observe all MCP traffic between any processes, MCPHawk offers unique value as a passive sniffer that mcpinspector does not. If you want to actively test servers, mcpinspector is better. For many workflows, they are complementary tools.
 
-| Feature                                      | mcp-shark | mcpinspector |
+| Feature                                      | MCPHawk | mcpinspector |
 |-----------------------------------------------|:---------:|:------------:|
 | Passive sniffing (no proxy needed)            |     ✅     |      ❌       |
 | Auto-detect MCP traffic on any port           |     ✅     |      ❌       |
@@ -59,18 +59,18 @@ If you want to observe all MCP traffic between any processes, mcp-shark offers u
 
 ```bash
 # Install from PyPI (when published)
-pip install mcp-shark
+pip install mcphawk
 
 # Or install directly from GitHub
-pip install git+https://github.com/dazzaji/mcp-shark.git
+pip install git+https://github.com/tech4242/mcphawk.git
 ```
 
 ### For Developers
 
 ```bash
 # Clone the repository
-git clone https://github.com/dazzaji/mcp-shark.git
-cd mcp-shark
+git clone https://github.com/tech4242/mcphawk.git
+cd mcphawk
 
 # Set up Python environment
 python3 -m venv .venv
@@ -95,35 +95,35 @@ python -m pytest -v
 ### Quick Start
 
 # Monitor MCP traffic on a specific port (console output)
-mcp-shark sniff --port 3000
+mcphawk sniff --port 3000
 
 # Monitor multiple ports with a custom filter
-mcp-shark sniff --filter "tcp port 3000 or tcp port 8080"
+mcphawk sniff --filter "tcp port 3000 or tcp port 8080"
 
 # Auto-detect MCP traffic on any port
-mcp-shark sniff --auto-detect
+mcphawk sniff --auto-detect
 
 # Start web UI with sniffer on specific port
-mcp-shark web --port 3000
+mcphawk web --port 3000
 
 # Start web UI with auto-detect mode
-mcp-shark web --auto-detect
+mcphawk web --auto-detect
 
 # Start web UI with custom filter for multiple ports
-mcp-shark web --filter "tcp port 3000 or tcp port 8080"
+mcphawk web --filter "tcp port 3000 or tcp port 8080"
 
 # View historical logs only (no active sniffing)
-mcp-shark web --no-sniffer
+mcphawk web --no-sniffer
 
 # Custom web server configuration
-mcp-shark web --port 3000 --host 0.0.0.0 --web-port 9000
+mcphawk web --port 3000 --host 0.0.0.0 --web-port 9000
 
 # Get help
-mcp-shark --help
+mcphawk --help
 
 # Get help for specific command
-mcp-shark sniff --help
-mcp-shark web --help
+mcphawk sniff --help
+mcphawk web --help
 ```
 
 ### Development Mode
@@ -137,11 +137,11 @@ make dev  # Runs both frontend and backend
 cd frontend && npm run dev
 
 # Terminal 2 - Backend
-mcp-shark web --port 3000
+mcphawk web --port 3000
 
 # Option 3: Watch mode
 cd frontend && npm run build:watch  # Auto-rebuild on changes
-mcp-shark web --port 3000           # In another terminal
+mcphawk web --port 3000           # In another terminal
 ```
 
 ### Testing with Dummy Server

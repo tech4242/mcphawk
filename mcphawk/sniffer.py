@@ -1,8 +1,3 @@
-"""
-Sniffer for MCP-Shark: captures packets and logs JSON-RPC messages.
-Cross-platform: works on macOS (loopback) and Linux.
-"""
-
 import asyncio
 from datetime import UTC, datetime
 import json
@@ -13,8 +8,8 @@ import platform
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 from scapy.all import sniff, IP, TCP, Raw, conf
-from mcp_shark.logger import log_message
-from mcp_shark.web.broadcaster import broadcast_new_log
+from mcphawk.logger import log_message
+from mcphawk.web.broadcaster import broadcast_new_log
 
 DEBUG = True
 
@@ -60,7 +55,7 @@ def packet_callback(pkt):
                 
                 # In auto-detect mode, log when we find MCP traffic on a new port
                 if _auto_detect_mode:
-                    print(f"[MCP-Shark] Detected MCP traffic on port {src_port} -> {dst_port}")
+                    print(f"[MCPHawk] Detected MCP traffic on port {src_port} -> {dst_port}")
                 
                 entry = {
                     "timestamp": ts,

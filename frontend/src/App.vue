@@ -6,7 +6,7 @@
         <div class="flex items-center justify-between h-16">
           <div class="flex items-center">
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-              🦈 MCP Shark
+              🦅 MCPHawk
             </h1>
             <ConnectionStatus class="ml-4" />
           </div>

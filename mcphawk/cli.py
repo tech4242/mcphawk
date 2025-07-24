@@ -1,19 +1,15 @@
-"""
-MCP-Shark CLI (Guaranteed Multi-Command Version)
-"""
-
 import logging
 import sys
 import typer
-from mcp_shark.web.server import run_web
-from mcp_shark.sniffer import start_sniffer
-from mcp_shark.logger import init_db
+from mcphawk.web.server import run_web
+from mcphawk.sniffer import start_sniffer
+from mcphawk.logger import init_db
 
 # Suppress Scapy warnings about network interfaces
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 # ✅ Typer multi-command app
-app = typer.Typer(help="MCP-Shark: Passive MCP traffic sniffer + dashboard")
+app = typer.Typer(help="MCPHawk: Passive MCP traffic sniffer + dashboard")
 
 # Initialize database once when CLI starts
 init_db()
@@ -30,9 +26,9 @@ def sniff(
     if not any([port, filter, auto_detect]):
         print("[ERROR] You must specify either --port, --filter, or --auto-detect")
         print("Examples:")
-        print("  mcp-shark sniff --port 3000")
-        print("  mcp-shark sniff --filter 'tcp port 3000 or tcp port 3001'")
-        print("  mcp-shark sniff --auto-detect")
+        print("  mcphawk sniff --port 3000")
+        print("  mcphawk sniff --filter 'tcp port 3000 or tcp port 3001'")
+        print("  mcphawk sniff --auto-detect")
         raise typer.Exit(1)
     
     if filter:
@@ -44,14 +40,14 @@ def sniff(
     else:
         # Auto-detect mode - capture all TCP traffic
         filter_expr = "tcp"
-        print("[MCP-Shark] Auto-detect mode: monitoring all TCP traffic for MCP messages")
+        print("[MCPHawk] Auto-detect mode: monitoring all TCP traffic for MCP messages")
     
-    print(f"[MCP-Shark] Starting sniffer with filter: {filter_expr}")
-    print("[MCP-Shark] Press Ctrl+C to stop...")
+    print(f"[MCPHawk] Starting sniffer with filter: {filter_expr}")
+    print("[MCPHawk] Press Ctrl+C to stop...")
     try:
         start_sniffer(filter_expr=filter_expr, auto_detect=auto_detect)
     except KeyboardInterrupt:
-        print("\n[MCP-Shark] Sniffer stopped.")
+        print("\n[MCPHawk] Sniffer stopped.")
         sys.exit(0)
 
 
@@ -64,15 +60,15 @@ def web(
     host: str = typer.Option("127.0.0.1", "--host", help="Web server host"),
     web_port: int = typer.Option(8000, "--web-port", help="Web server port")
 ):
-    """Start the MCP-Shark dashboard with sniffer."""
+    """Start the MCPHawk dashboard with sniffer."""
     # If sniffer is enabled, validate that user specified either port, filter, or auto-detect
     if not no_sniffer and not any([port, filter, auto_detect]):
         print("[ERROR] You must specify either --port, --filter, or --auto-detect (or use --no-sniffer)")
         print("Examples:")
-        print("  mcp-shark web --port 3000")
-        print("  mcp-shark web --filter 'tcp port 3000 or tcp port 3001'")
-        print("  mcp-shark web --auto-detect")
-        print("  mcp-shark web --no-sniffer  # View historical logs only")
+        print("  mcphawk web --port 3000")
+        print("  mcphawk web --filter 'tcp port 3000 or tcp port 3001'")
+        print("  mcphawk web --auto-detect")
+        print("  mcphawk web --no-sniffer  # View historical logs only")
         raise typer.Exit(1)
     
     # Prepare filter expression

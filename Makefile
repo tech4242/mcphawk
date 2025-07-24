@@ -22,7 +22,7 @@ dev:
 	@make -j 2 dev-backend dev-frontend
 
 dev-backend:
-	mcp-shark web --port 3000
+	mcphawk web --port 3000
 
 dev-frontend:
 	cd frontend && npm run dev
@@ -38,7 +38,7 @@ test-watch:
 clean:
 	rm -rf frontend/node_modules
 	rm -rf frontend/dist
-	rm -rf mcp_shark/web/static/*
+	rm -rf mcphawk/web/static/*
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type d -name .pytest_cache -exec rm -rf {} +
 	find . -type d -name .coverage -exec rm -rf {} +

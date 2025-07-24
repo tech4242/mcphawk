@@ -1,12 +1,3 @@
-"""
-MCP-Shark Web Server (Phase 1.7 - Fixed UI Updates)
-
-Provides:
-- REST API for log retrieval
-- WebSocket endpoint for live traffic updates
-- Static serving of the Vue dashboard
-"""
-
 import os
 import asyncio
 import threading
@@ -15,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 
-from mcp_shark.logger import fetch_logs
-from mcp_shark.web.broadcaster import active_clients
+from mcphawk.logger import fetch_logs
+from mcphawk.web.broadcaster import active_clients
 
 DEBUG = True
 
@@ -98,7 +89,7 @@ def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False):
         filter_expr: BPF filter expression for the sniffer.
         auto_detect: Whether to auto-detect MCP traffic.
     """
-    from mcp_shark.sniffer import start_sniffer
+    from mcphawk.sniffer import start_sniffer
 
     def safe_start():
         if DEBUG:
@@ -126,12 +117,12 @@ def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, fil
         _start_sniffer_thread(filter_expr, auto_detect)
 
     if sniffer:
-        print(f"[MCP-Shark] Starting sniffer and dashboard on http://{host}:{port}")
-        print(f"[MCP-Shark] Using filter: {filter_expr}")
+        print(f"[MCPHawk] Starting sniffer and dashboard on http://{host}:{port}")
+        print(f"[MCPHawk] Using filter: {filter_expr}")
         if auto_detect:
-            print("[MCP-Shark] Auto-detect mode enabled")
+            print("[MCPHawk] Auto-detect mode enabled")
     else:
-        print(f"[MCP-Shark] Starting dashboard only (no sniffer) on http://{host}:{port}")
+        print(f"[MCPHawk] Starting dashboard only (no sniffer) on http://{host}:{port}")
 
     import uvicorn
     uvicorn.run(app, host=host, port=port)

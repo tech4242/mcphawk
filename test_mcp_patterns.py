@@ -169,7 +169,7 @@ def main():
             })
             
             print("\n=== All test messages sent! ===")
-            print("Check the MCP-Shark UI to see how messages are displayed.")
+            print("Check the MCPHawk UI to see how messages are displayed.")
             
     except ConnectionRefusedError:
         print(f"Error: Could not connect to {host}:{port}")
