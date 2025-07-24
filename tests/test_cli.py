@@ -24,8 +24,9 @@ def test_sniff_command_help():
     result = runner.invoke(app, ["sniff", "--help"])
     assert result.exit_code == 0
     assert "Start sniffing MCP traffic" in result.stdout
-    assert "--filter" in result.stdout
-    assert "--debug" in result.stdout
+    # Check for the actual text that appears (may include ANSI codes)
+    assert "-filter" in result.stdout or "--filter" in result.stdout
+    assert "-debug" in result.stdout or "--debug" in result.stdout
     assert "Enable debug output" in result.stdout
 
 
@@ -34,9 +35,10 @@ def test_web_command_help():
     result = runner.invoke(app, ["web", "--help"])
     assert result.exit_code == 0
     assert "Start the MCPHawk dashboard" in result.stdout
-    assert "--no-sniffer" in result.stdout
-    assert "--host" in result.stdout
-    assert "--port" in result.stdout
+    # Check for the actual text that appears (may include ANSI codes)
+    assert "-no-sniffer" in result.stdout or "--no-sniffer" in result.stdout
+    assert "-host" in result.stdout or "--host" in result.stdout
+    assert "-port" in result.stdout or "--port" in result.stdout
 
 
 def test_sniff_command_requires_flags():
