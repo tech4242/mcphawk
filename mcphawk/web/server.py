@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import threading
 from typing import Optional
@@ -11,7 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from mcphawk.logger import fetch_logs
 from mcphawk.web.broadcaster import active_clients
 
-DEBUG = True
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -37,8 +39,7 @@ def get_logs(limit: int = 50):
         List of log entries as JSON-serializable dictionaries.
     """
     logs = fetch_logs(limit)
-    if DEBUG:
-        print(f"[DEBUG] /logs returned {len(logs)} entries")
+    logger.debug(f"/logs returned {len(logs)} entries")
     return JSONResponse(content=[
         {
             **log,
@@ -56,8 +57,7 @@ async def websocket_endpoint(websocket: WebSocket):
     """
     await websocket.accept()
     active_clients.append(websocket)
-    if DEBUG:
-        print(f"[DEBUG] WebSocket connected: {len(active_clients)} active clients")
+    logger.debug(f"WebSocket connected: {len(active_clients)} active clients")
 
     try:
         while True:
@@ -74,35 +74,34 @@ async def websocket_endpoint(websocket: WebSocket):
                 except Exception:
                     break
     except (WebSocketDisconnect, ConnectionResetError, Exception) as e:
-        if DEBUG and not isinstance(e, WebSocketDisconnect):
-            print(f"[DEBUG] WebSocket error: {type(e).__name__}: {e}")
+        if not isinstance(e, WebSocketDisconnect):
+            logger.debug(f"WebSocket error: {type(e).__name__}: {e}")
     finally:
         if websocket in active_clients:
             active_clients.remove(websocket)
-        if DEBUG:
-            print(f"[DEBUG] WebSocket disconnected: {len(active_clients)} active clients")
+        logger.debug(f"WebSocket disconnected: {len(active_clients)} active clients")
 
 
-def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False):
+def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False, debug: bool = False):
     """
     Start the sniffer in a dedicated daemon thread.
 
     Args:
         filter_expr: BPF filter expression for the sniffer.
         auto_detect: Whether to auto-detect MCP traffic.
+        debug: Whether to enable debug logging.
     """
     from mcphawk.sniffer import start_sniffer
 
     def safe_start():
-        if DEBUG:
-            print(f"[DEBUG] Sniffer thread starting with filter: {filter_expr}, auto_detect: {auto_detect}")
-        return start_sniffer(filter_expr=filter_expr, auto_detect=auto_detect)
+        logger.debug(f"Sniffer thread starting with filter: {filter_expr}, auto_detect: {auto_detect}")
+        return start_sniffer(filter_expr=filter_expr, auto_detect=auto_detect, debug=debug)
 
     thread = threading.Thread(target=safe_start, daemon=True)
     thread.start()
 
 
-def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: Optional[str] = None, auto_detect: bool = False):
+def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: Optional[str] = None, auto_detect: bool = False, debug: bool = False):
     """
     Run the web server and optionally the sniffer.
 
@@ -112,11 +111,12 @@ def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, fil
         port: Port to run the server on.
         filter_expr: BPF filter expression for the sniffer.
         auto_detect: Whether to auto-detect MCP traffic.
+        debug: Whether to enable debug logging.
     """
     if sniffer:
         if not filter_expr:
             raise ValueError("filter_expr is required when sniffer is enabled")
-        _start_sniffer_thread(filter_expr, auto_detect)
+        _start_sniffer_thread(filter_expr, auto_detect, debug)
 
     if sniffer:
         print(f"[MCPHawk] Starting sniffer and dashboard on http://{host}:{port}")
@@ -125,6 +125,11 @@ def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, fil
             print("[MCPHawk] Auto-detect mode enabled")
     else:
         print(f"[MCPHawk] Starting dashboard only (no sniffer) on http://{host}:{port}")
+
+    # Configure logging based on debug flag
+    if debug:
+        logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
+        logger.setLevel(logging.DEBUG)
 
     import uvicorn
     uvicorn.run(app, host=host, port=port)

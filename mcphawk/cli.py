@@ -21,7 +21,8 @@ init_db()
 def sniff(
     port: int = typer.Option(None, "--port", "-p", help="TCP port to monitor"),
     filter: str = typer.Option(None, "--filter", "-f", help="Custom BPF filter expression"),
-    auto_detect: bool = typer.Option(False, "--auto-detect", "-a", help="Auto-detect MCP traffic on any port")
+    auto_detect: bool = typer.Option(False, "--auto-detect", "-a", help="Auto-detect MCP traffic on any port"),
+    debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug output")
 ):
     """Start sniffing MCP traffic (console output only)."""
     # Validate that user specified either port, filter, or auto-detect
@@ -47,7 +48,7 @@ def sniff(
     print(f"[MCPHawk] Starting sniffer with filter: {filter_expr}")
     print("[MCPHawk] Press Ctrl+C to stop...")
     try:
-        start_sniffer(filter_expr=filter_expr, auto_detect=auto_detect)
+        start_sniffer(filter_expr=filter_expr, auto_detect=auto_detect, debug=debug)
     except KeyboardInterrupt:
         print("\n[MCPHawk] Sniffer stopped.")
         sys.exit(0)
@@ -60,7 +61,8 @@ def web(
     auto_detect: bool = typer.Option(False, "--auto-detect", "-a", help="Auto-detect MCP traffic on any port"),
     no_sniffer: bool = typer.Option(False, "--no-sniffer", help="Disable sniffer (view historical logs only)"),
     host: str = typer.Option("127.0.0.1", "--host", help="Web server host"),
-    web_port: int = typer.Option(8000, "--web-port", help="Web server port")
+    web_port: int = typer.Option(8000, "--web-port", help="Web server port"),
+    debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug output")
 ):
     """Start the MCPHawk dashboard with sniffer."""
     # If sniffer is enabled, validate that user specified either port, filter, or auto-detect
@@ -88,5 +90,6 @@ def web(
         host=host,
         port=web_port,
         filter_expr=filter_expr,
-        auto_detect=auto_detect
+        auto_detect=auto_detect,
+        debug=debug
     )

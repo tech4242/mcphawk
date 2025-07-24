@@ -151,18 +151,13 @@ class TestAutoDetect:
             assert "[MCPHawk] Detected MCP traffic on port" not in str(call_args)
 
     @patch('mcphawk.sniffer.sniff')
-    @patch('builtins.print')
-    def test_start_sniffer_auto_detect_flag(self, mock_print, mock_sniff):
+    def test_start_sniffer_auto_detect_flag(self, mock_sniff):
         """Test that start_sniffer sets auto_detect mode and uses correct filter."""
         start_sniffer(filter_expr="tcp", auto_detect=True)
 
         # Check that auto_detect mode was enabled
         import mcphawk.sniffer
         assert mcphawk.sniffer._auto_detect_mode == True
-
-        # Check debug messages
-        mock_print.assert_any_call("[DEBUG] Starting sniffer with filter: tcp")
-        mock_print.assert_any_call("[DEBUG] Auto-detect mode enabled")
 
         # Check sniff was called with tcp filter
         mock_sniff.assert_called_once()

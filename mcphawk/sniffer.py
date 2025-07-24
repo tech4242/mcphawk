@@ -11,15 +11,15 @@ from scapy.all import IP, TCP, Raw, conf, sniff  # noqa: E402
 from mcphawk.logger import log_message  # noqa: E402
 from mcphawk.web.broadcaster import broadcast_new_log  # noqa: E402
 
-DEBUG = True
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 async def _safe_broadcast(log_entry: dict) -> None:
     try:
         await broadcast_new_log(log_entry)
     except Exception as e:
-        if DEBUG:
-            print(f"[DEBUG] Broadcast failed: {e}")
+        logger.debug(f"Broadcast failed: {e}")
 
 
 def _broadcast_in_any_loop(log_entry: dict) -> None:
@@ -40,14 +40,13 @@ def packet_callback(pkt):
     """
     if pkt.haslayer(Raw):
         raw_payload = pkt[Raw].load
-        if DEBUG and not _auto_detect_mode:  # Less verbose in auto-detect mode
-            print(f"[DEBUG] Raw payload: {raw_payload[:60]}...")
+        if not _auto_detect_mode:  # Less verbose in auto-detect mode
+            logger.debug(f"Raw payload: {raw_payload[:60]}...")
 
         try:
             decoded = raw_payload.decode("utf-8", errors="ignore")
             if decoded.startswith("{") and "jsonrpc" in decoded:
-                if DEBUG:
-                    print(f"[DEBUG] Sniffer captured: {decoded}")
+                logger.debug(f"Sniffer captured: {decoded}")
 
                 ts = datetime.now(tz=UTC)
                 src_port = pkt[TCP].sport if pkt.haslayer(TCP) else 0
@@ -74,11 +73,10 @@ def packet_callback(pkt):
                 broadcast_entry["timestamp"] = ts.isoformat()
                 _broadcast_in_any_loop(broadcast_entry)
         except Exception as e:
-            if DEBUG:
-                print(f"[DEBUG] JSON decode failed: {e}")
+            logger.debug(f"JSON decode failed: {e}")
 
 
-def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = False) -> None:
+def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = False, debug: bool = False) -> None:
     """
     Start sniffing packets on the appropriate interface.
     - On macOS: use `lo0`
@@ -87,14 +85,19 @@ def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = F
     Args:
         filter_expr: BPF filter expression
         auto_detect: If True, automatically detect MCP traffic on any port
+        debug: If True, enable debug logging
     """
     global _auto_detect_mode
     _auto_detect_mode = auto_detect
 
-    if DEBUG:
-        print(f"[DEBUG] Starting sniffer with filter: {filter_expr}")
-        if auto_detect:
-            print("[DEBUG] Auto-detect mode enabled")
+    # Configure logging based on debug flag
+    if debug:
+        logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
+        logger.setLevel(logging.DEBUG)
+
+    logger.debug(f"Starting sniffer with filter: {filter_expr}")
+    if auto_detect:
+        logger.debug("Auto-detect mode enabled")
 
     # Ensure better pcap support on macOS
     conf.use_pcap = True

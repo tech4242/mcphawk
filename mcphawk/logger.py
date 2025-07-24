@@ -1,7 +1,11 @@
+import logging
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 # Database file (shared with tests)
 DB_FILE = "mcphawk_logs.db"
@@ -16,7 +20,7 @@ def init_db() -> None:
     """
     Initialize the SQLite database and ensure the logs table exists.
     """
-    print(f"[DEBUG] init_db: Using DB_PATH = {DB_PATH}")
+    logger.debug(f"init_db: Using DB_PATH = {DB_PATH}")
     if not DB_PATH or not str(DB_PATH).strip():
         raise ValueError("DB_PATH is not set or is empty")
 
@@ -88,11 +92,11 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
     """
     # Ensure we're using the correct path
     current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
-    print(f"[DEBUG] fetch_logs: Using DB_PATH = {current_path}, exists = {current_path.exists() if current_path else False}")
+    logger.debug(f"fetch_logs: Using DB_PATH = {current_path}, exists = {current_path.exists() if current_path else False}")
 
     # If the database doesn't exist, it might have been deleted or path changed
     if not current_path.exists():
-        print(f"[WARNING] Database file not found at {current_path}")
+        logger.warning(f"Database file not found at {current_path}")
         return []
 
     conn = sqlite3.connect(current_path)
@@ -133,9 +137,9 @@ def set_db_path(path: str) -> None:
     if path:
         DB_PATH = Path(path)
         _db_initialized = False  # Reset initialization flag when path changes
-        print(f"[DEBUG] set_db_path: Changed DB_PATH to {DB_PATH}")
+        logger.debug(f"set_db_path: Changed DB_PATH to {DB_PATH}")
     else:
-        print(f"[WARNING] set_db_path: Ignoring empty path, keeping DB_PATH as {DB_PATH}")
+        logger.warning(f"set_db_path: Ignoring empty path, keeping DB_PATH as {DB_PATH}")
 
 
 def clear_logs() -> None:
