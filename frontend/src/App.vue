@@ -5,9 +5,7 @@
       <div class="px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
           <div class="flex items-center">
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-              🦅 MCPHawk
-            </h1>
+            <img src="/mcphawk_logo.png" alt="MCPHawk Logo" class="h-[62px]">
             <ConnectionStatus class="ml-4" />
           </div>
           <div class="flex items-center space-x-4">
