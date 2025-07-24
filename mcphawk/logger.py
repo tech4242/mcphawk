@@ -1,6 +1,6 @@
 import logging
 import sqlite3
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -58,7 +58,7 @@ def log_message(entry: dict[str, Any]) -> None:
             direction (str): 'incoming', 'outgoing', or 'unknown'
             message (str)
     """
-    timestamp = entry.get("timestamp", datetime.now(tz=UTC))
+    timestamp = entry.get("timestamp", datetime.now(tz=timezone.utc))
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute(

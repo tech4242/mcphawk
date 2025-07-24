@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import platform
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 # Suppress Scapy warnings before importing
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
@@ -48,7 +48,7 @@ def packet_callback(pkt):
             if decoded.startswith("{") and "jsonrpc" in decoded:
                 logger.debug(f"Sniffer captured: {decoded}")
 
-                ts = datetime.now(tz=UTC)
+                ts = datetime.now(tz=timezone.utc)
                 src_port = pkt[TCP].sport if pkt.haslayer(TCP) else 0
                 dst_port = pkt[TCP].dport if pkt.haslayer(TCP) else 0
 
