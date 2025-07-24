@@ -30,7 +30,13 @@ def clean_db():
 @pytest.fixture(scope="module")
 def dummy_server():
     """Spin up a dummy MCP-like TCP echo server in a background thread."""
-    host, port = "127.0.0.1", 12345
+    host = "127.0.0.1"
+    
+    # Use port 0 to let OS assign an available port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as temp_sock:
+        temp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        temp_sock.bind((host, 0))
+        _, port = temp_sock.getsockname()
 
     def server():
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
