@@ -449,25 +449,81 @@
 
     // Load old logs
     fetch("/logs?limit=100")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
+        console.log(`Loaded ${data.length} historical logs`);
         data.reverse().forEach((entry) => {
           const parsed = normalizeEntry(entry);
           const messageEl = createMessageElement(parsed);
           logsDiv.prepend(messageEl);
         });
         applyFilter();
+      })
+      .catch((error) => {
+        console.error('Error loading logs:', error);
+        // Add a visual error indicator
+        const errorDiv = document.createElement('div');
+        errorDiv.style.textAlign = 'center';
+        errorDiv.style.color = '#dc322f';
+        errorDiv.style.padding = '20px';
+        errorDiv.textContent = `Failed to load historical logs: ${error.message}`;
+        logsDiv.appendChild(errorDiv);
       });
 
     // WebSocket live updates
     const ws = new WebSocket(`ws://${location.host}/ws`);
-    ws.onmessage = (event) => {
-      let entry = JSON.parse(event.data);
-      entry = normalizeEntry(entry);
-      const messageEl = createMessageElement(entry);
-      logsDiv.prepend(messageEl);
-      applyFilter();
+    
+    ws.onopen = () => {
+      console.log('WebSocket connected for live updates');
     };
+    
+    ws.onmessage = (event) => {
+      try {
+        let data = JSON.parse(event.data);
+        
+        // Handle ping messages
+        if (data.type === 'ping') {
+          // Just a keepalive, ignore
+          return;
+        }
+        
+        // Process log entries
+        let entry = normalizeEntry(data);
+        const messageEl = createMessageElement(entry);
+        logsDiv.prepend(messageEl);
+        applyFilter();
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    };
+    
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+    
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+      // Add a visual indicator
+      const statusDiv = document.createElement('div');
+      statusDiv.style.textAlign = 'center';
+      statusDiv.style.color = '#b58900';
+      statusDiv.style.padding = '10px';
+      statusDiv.style.fontSize = '12px';
+      statusDiv.textContent = 'Live updates disconnected - refresh page to reconnect';
+      document.getElementById('stats').appendChild(statusDiv);
+    };
+    
+    // Clean up WebSocket on page unload
+    window.addEventListener('beforeunload', () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    });
   </script>
 </body>
 </html>

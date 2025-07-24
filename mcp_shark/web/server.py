@@ -68,9 +68,21 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            await asyncio.sleep(30)
-    except WebSocketDisconnect:
-        pass
+            # Keep connection alive with ping
+            try:
+                await asyncio.wait_for(
+                    websocket.receive_text(),  # Wait for any message
+                    timeout=30.0
+                )
+            except asyncio.TimeoutError:
+                # Send ping to check if client is still alive
+                try:
+                    await websocket.send_json({"type": "ping"})
+                except Exception:
+                    break
+    except (WebSocketDisconnect, ConnectionResetError, Exception) as e:
+        if DEBUG and not isinstance(e, WebSocketDisconnect):
+            print(f"[DEBUG] WebSocket error: {type(e).__name__}: {e}")
     finally:
         if websocket in active_clients:
             active_clients.remove(websocket)

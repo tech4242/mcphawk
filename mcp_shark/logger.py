@@ -24,13 +24,21 @@ from typing import List, Dict, Any
 
 # Database file (shared with tests)
 DB_FILE = "mcp_shark_logs.db"
-DB_PATH = Path(__file__).resolve().parent.parent / DB_FILE
+_DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent / DB_FILE
+DB_PATH = _DEFAULT_DB_PATH
+
+# Module initialization flag
+_db_initialized = False
 
 
 def init_db() -> None:
     """
     Initialize the SQLite database and ensure the logs table exists.
     """
+    print(f"[DEBUG] init_db: Using DB_PATH = {DB_PATH}")
+    if not DB_PATH or not str(DB_PATH).strip():
+        raise ValueError("DB_PATH is not set or is empty")
+    
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute(
@@ -65,8 +73,6 @@ def log_message(entry: Dict[str, Any]) -> None:
             direction (str): 'incoming', 'outgoing', or 'unknown'
             message (str)
     """
-    init_db()
-
     timestamp = entry.get("timestamp", datetime.now(tz=UTC))
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -99,9 +105,16 @@ def fetch_logs(limit: int = 100) -> List[Dict[str, Any]]:
     Returns:
         List of dictionaries matching MCPMessageLog format.
     """
-    init_db()
-
-    conn = sqlite3.connect(DB_PATH)
+    # Ensure we're using the correct path
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    print(f"[DEBUG] fetch_logs: Using DB_PATH = {current_path}, exists = {current_path.exists() if current_path else False}")
+    
+    # If the database doesn't exist, it might have been deleted or path changed
+    if not current_path.exists():
+        print(f"[WARNING] Database file not found at {current_path}")
+        return []
+    
+    conn = sqlite3.connect(current_path)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     cur.execute(
@@ -135,8 +148,13 @@ def set_db_path(path: str) -> None:
     """
     Override the default DB path (used in tests).
     """
-    global DB_PATH
-    DB_PATH = Path(path)
+    global DB_PATH, _db_initialized
+    if path:
+        DB_PATH = Path(path)
+        _db_initialized = False  # Reset initialization flag when path changes
+        print(f"[DEBUG] set_db_path: Changed DB_PATH to {DB_PATH}")
+    else:
+        print(f"[WARNING] set_db_path: Ignoring empty path, keeping DB_PATH as {DB_PATH}")
 
 
 def clear_logs() -> None:
@@ -144,7 +162,6 @@ def clear_logs() -> None:
     Clear all logs from the database.
     Mainly used in tests.
     """
-    init_db()  # Ensure the table exists before clearing
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("DELETE FROM logs;")

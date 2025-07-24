@@ -7,12 +7,16 @@ import sys
 import typer
 from mcp_shark.web.server import run_web
 from mcp_shark.sniffer import start_sniffer
+from mcp_shark.logger import init_db
 
 # Suppress Scapy warnings about network interfaces
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
 # ✅ Typer multi-command app
 app = typer.Typer(help="MCP-Shark: Passive MCP traffic sniffer + dashboard")
+
+# Initialize database once when CLI starts
+init_db()
 
 
 @app.command()
