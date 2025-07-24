@@ -6,17 +6,16 @@ Covers:
 - WebSocket broadcasting of new log entries
 """
 
-import asyncio
+import os
+import tempfile
 from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 
-from mcphawk.logger import log_message, set_db_path, init_db
-from mcphawk.web.server import app
+from mcphawk.logger import init_db, log_message, set_db_path
 from mcphawk.web.broadcaster import broadcast_new_log
-import os
-import tempfile
+from mcphawk.web.server import app
 
 client = TestClient(app)
 
@@ -41,7 +40,7 @@ def clean_db():
     Ensure the database is cleared before each test.
     """
     import sqlite3
-    
+
     conn = sqlite3.connect(TEST_DB_PATH)
     with conn:
         conn.execute("DELETE FROM logs;")
@@ -155,14 +154,14 @@ def test_logs_persist_across_requests():
         "direction": "incoming",
         "message": '{"jsonrpc":"2.0","method":"persistTest","id":1}'
     })
-    
+
     # First request
     response1 = client.get("/logs?limit=10")
     assert response1.status_code == 200
     data1 = response1.json()
     assert len(data1) == 1
     assert "persistTest" in data1[0]["message"]
-    
+
     # Second request should return the same data
     response2 = client.get("/logs?limit=10")
     assert response2.status_code == 200
@@ -174,7 +173,7 @@ def test_logs_persist_across_requests():
 def test_logs_order_newest_first():
     """Test that logs are returned in reverse chronological order."""
     import time
-    
+
     # Add logs with small delays to ensure different timestamps
     for i in range(3):
         log_message({
@@ -187,11 +186,11 @@ def test_logs_order_newest_first():
             "message": f'{{"jsonrpc":"2.0","method":"order{i}","id":{i}}}'
         })
         time.sleep(0.01)  # Small delay to ensure different timestamps
-    
+
     response = client.get("/logs?limit=10")
     assert response.status_code == 200
     data = response.json()
-    
+
     # Should be in reverse order (newest first)
     assert len(data) == 3
     assert "order2" in data[0]["message"]
@@ -212,7 +211,7 @@ def test_logs_default_limit():
             "direction": "incoming",
             "message": f'{{"jsonrpc":"2.0","method":"bulk","id":{i}}}'
         })
-    
+
     # Request without limit should return 50
     response = client.get("/logs")
     assert response.status_code == 200
@@ -231,16 +230,16 @@ def test_log_fields_preserved_in_api():
         "direction": "outgoing",
         "message": '{"jsonrpc":"2.0","method":"fieldTest","id":"abc"}'
     }
-    
+
     log_message(test_entry)
-    
+
     response = client.get("/logs?limit=1")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert len(data) == 1
     log = data[0]
-    
+
     assert log["src_ip"] == "10.0.0.1"
     assert log["dst_ip"] == "10.0.0.2"
     assert log["src_port"] == 54321

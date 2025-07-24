@@ -1,11 +1,9 @@
-from typing import Dict, Tuple, List
-
 
 # Track buffers for fragmented WebSocket messages per connection
-ws_buffers: Dict[Tuple[str, int, str, int], bytearray] = {}
+ws_buffers: dict[tuple[str, int, str, int], bytearray] = {}
 
 
-def _parse_ws_frames(data: bytes) -> List[str]:
+def _parse_ws_frames(data: bytes) -> list[str]:
     """
     Parse one or more unmasked WebSocket frames (server->client style).
 
@@ -73,7 +71,7 @@ def process_ws_packet(
     dst_ip: str,
     dst_port: int,
     payload: bytes
-) -> List[str]:
+) -> list[str]:
     """
     Process TCP payloads and reconstruct WebSocket text messages.
 

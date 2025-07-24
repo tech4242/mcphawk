@@ -27,3 +27,59 @@ mcphawk = "mcphawk.cli:app"
 
 [tool.setuptools]
 packages = ["mcphawk", "mcphawk.web"]
+
+[tool.ruff]
+# Exclude a variety of commonly ignored directories
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    ".venv",
+    "frontend",
+]
+
+# Same as Black
+line-length = 88
+
+# Assume Python 3.9
+target-version = "py39"
+
+[tool.ruff.lint]
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default
+select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "SIM", "RUF"]
+ignore = [
+    "E501",  # Line too long - we'll handle this case by case
+    "A002",  # Argument shadowing Python builtin
+]
+
+# Allow autofix for all enabled rules (when `--fix`) is provided
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+# Ignore imports in __init__.py files
+"__init__.py" = ["F401", "E402"]
+# Ignore assert statements in tests
+"test_*.py" = ["S101", "E712"]
+"tests/*.py" = ["S101", "E712"]

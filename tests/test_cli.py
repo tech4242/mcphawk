@@ -1,11 +1,11 @@
 """Tests for the MCPHawk CLI."""
 
 import logging
-from unittest.mock import patch, MagicMock
-from typer.testing import CliRunner
-from mcphawk.cli import app
-import pytest
+from unittest.mock import patch
 
+from typer.testing import CliRunner
+
+from mcphawk.cli import app
 
 runner = CliRunner()
 
@@ -51,7 +51,7 @@ def test_sniff_command_requires_flags():
 def test_sniff_command_with_port(mock_start_sniffer):
     """Test sniff command with port option."""
     mock_start_sniffer.side_effect = KeyboardInterrupt()
-    
+
     result = runner.invoke(app, ["sniff", "--port", "3000"])
     assert result.exit_code == 0
     assert "[MCPHawk] Starting sniffer with filter: tcp port 3000" in result.stdout
@@ -63,7 +63,7 @@ def test_sniff_command_with_port(mock_start_sniffer):
 def test_sniff_command_custom_filter(mock_start_sniffer):
     """Test sniff command with custom filter."""
     mock_start_sniffer.side_effect = KeyboardInterrupt()
-    
+
     result = runner.invoke(app, ["sniff", "--filter", "tcp port 8080"])
     assert result.exit_code == 0
     assert "[MCPHawk] Starting sniffer with filter: tcp port 8080" in result.stdout
@@ -74,7 +74,7 @@ def test_sniff_command_custom_filter(mock_start_sniffer):
 def test_sniff_command_auto_detect(mock_start_sniffer):
     """Test sniff command with auto-detect mode."""
     mock_start_sniffer.side_effect = KeyboardInterrupt()
-    
+
     result = runner.invoke(app, ["sniff", "--auto-detect"])
     assert result.exit_code == 0
     assert "[MCPHawk] Auto-detect mode: monitoring all TCP traffic for MCP messages" in result.stdout
@@ -136,9 +136,7 @@ def test_web_command_auto_detect(mock_run_web):
 def test_scapy_warnings_suppressed():
     """Test that Scapy warnings are suppressed."""
     # Import should not produce warnings
-    import mcphawk.cli
-    import mcphawk.sniffer
-    
+
     # Check that scapy.runtime logger is set to ERROR level
     scapy_logger = logging.getLogger("scapy.runtime")
     assert scapy_logger.level == logging.ERROR

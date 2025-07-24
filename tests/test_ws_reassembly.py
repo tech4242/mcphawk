@@ -32,7 +32,7 @@ def build_ws_frame(message: bytes, fin: bool = True, opcode: int = 0x1) -> bytes
 
 def test_process_ws_packet_complete():
     """Ensure a full single WebSocket frame is reassembled correctly."""
-    message = '{"jsonrpc":"2.0","method":"ping"}'.encode()
+    message = b'{"jsonrpc":"2.0","method":"ping"}'
     frame = build_ws_frame(message)
 
     msgs = process_ws_packet(SRC_IP, SRC_PORT, DST_IP, DST_PORT, frame)
@@ -42,7 +42,7 @@ def test_process_ws_packet_complete():
 
 def test_process_ws_packet_fragmented():
     """Ensure fragmented WebSocket frames are reassembled correctly."""
-    full_msg = '{"jsonrpc":"2.0","method":"pong"}'.encode()
+    full_msg = b'{"jsonrpc":"2.0","method":"pong"}'
     mid = len(full_msg) // 2
 
     frame1 = build_ws_frame(full_msg[:mid], fin=False, opcode=0x1)

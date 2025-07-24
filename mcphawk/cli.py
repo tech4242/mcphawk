@@ -1,9 +1,11 @@
 import logging
 import sys
+
 import typer
-from mcphawk.web.server import run_web
-from mcphawk.sniffer import start_sniffer
+
 from mcphawk.logger import init_db
+from mcphawk.sniffer import start_sniffer
+from mcphawk.web.server import run_web
 
 # Suppress Scapy warnings about network interfaces
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
@@ -30,7 +32,7 @@ def sniff(
         print("  mcphawk sniff --filter 'tcp port 3000 or tcp port 3001'")
         print("  mcphawk sniff --auto-detect")
         raise typer.Exit(1)
-    
+
     if filter:
         # User provided custom filter
         filter_expr = filter
@@ -41,7 +43,7 @@ def sniff(
         # Auto-detect mode - capture all TCP traffic
         filter_expr = "tcp"
         print("[MCPHawk] Auto-detect mode: monitoring all TCP traffic for MCP messages")
-    
+
     print(f"[MCPHawk] Starting sniffer with filter: {filter_expr}")
     print("[MCPHawk] Press Ctrl+C to stop...")
     try:
@@ -70,7 +72,7 @@ def web(
         print("  mcphawk web --auto-detect")
         print("  mcphawk web --no-sniffer  # View historical logs only")
         raise typer.Exit(1)
-    
+
     # Prepare filter expression
     if filter:
         filter_expr = filter
@@ -80,10 +82,10 @@ def web(
         filter_expr = "tcp"
     else:
         filter_expr = None  # No sniffer
-    
+
     run_web(
-        sniffer=not no_sniffer, 
-        host=host, 
+        sniffer=not no_sniffer,
+        host=host,
         port=web_port,
         filter_expr=filter_expr,
         auto_detect=auto_detect

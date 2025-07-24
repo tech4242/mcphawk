@@ -1,10 +1,12 @@
-import os
 import asyncio
+import os
 import threading
+from typing import Optional
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from mcphawk.logger import fetch_logs
 from mcphawk.web.broadcaster import active_clients
@@ -84,7 +86,7 @@ async def websocket_endpoint(websocket: WebSocket):
 def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False):
     """
     Start the sniffer in a dedicated daemon thread.
-    
+
     Args:
         filter_expr: BPF filter expression for the sniffer.
         auto_detect: Whether to auto-detect MCP traffic.
@@ -100,7 +102,7 @@ def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False):
     thread.start()
 
 
-def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: str = None, auto_detect: bool = False):
+def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: Optional[str] = None, auto_detect: bool = False):
     """
     Run the web server and optionally the sniffer.
 

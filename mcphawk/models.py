@@ -1,5 +1,5 @@
-from typing import TypedDict, Literal
 from datetime import datetime
+from typing import Literal, TypedDict
 
 Direction = Literal["incoming", "outgoing", "unknown"]
 

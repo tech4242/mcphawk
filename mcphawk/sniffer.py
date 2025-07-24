@@ -1,15 +1,15 @@
 import asyncio
-from datetime import UTC, datetime
-import json
 import logging
 import platform
+from datetime import UTC, datetime
 
 # Suppress Scapy warnings before importing
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
-from scapy.all import sniff, IP, TCP, Raw, conf
-from mcphawk.logger import log_message
-from mcphawk.web.broadcaster import broadcast_new_log
+from scapy.all import IP, TCP, Raw, conf, sniff  # noqa: E402
+
+from mcphawk.logger import log_message  # noqa: E402
+from mcphawk.web.broadcaster import broadcast_new_log  # noqa: E402
 
 DEBUG = True
 
@@ -25,7 +25,7 @@ async def _safe_broadcast(log_entry: dict) -> None:
 def _broadcast_in_any_loop(log_entry: dict) -> None:
     try:
         loop = asyncio.get_running_loop()
-        loop.create_task(_safe_broadcast(log_entry))
+        _ = loop.create_task(_safe_broadcast(log_entry))  # noqa: RUF006
     except RuntimeError:
         asyncio.run(_safe_broadcast(log_entry))
 
@@ -52,11 +52,11 @@ def packet_callback(pkt):
                 ts = datetime.now(tz=UTC)
                 src_port = pkt[TCP].sport if pkt.haslayer(TCP) else 0
                 dst_port = pkt[TCP].dport if pkt.haslayer(TCP) else 0
-                
+
                 # In auto-detect mode, log when we find MCP traffic on a new port
                 if _auto_detect_mode:
                     print(f"[MCPHawk] Detected MCP traffic on port {src_port} -> {dst_port}")
-                
+
                 entry = {
                     "timestamp": ts,
                     "src_ip": pkt[IP].src if pkt.haslayer(IP) else "",
@@ -83,14 +83,14 @@ def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = F
     Start sniffing packets on the appropriate interface.
     - On macOS: use `lo0`
     - On Linux: default interface
-    
+
     Args:
         filter_expr: BPF filter expression
         auto_detect: If True, automatically detect MCP traffic on any port
     """
     global _auto_detect_mode
     _auto_detect_mode = auto_detect
-    
+
     if DEBUG:
         print(f"[DEBUG] Starting sniffer with filter: {filter_expr}")
         if auto_detect:

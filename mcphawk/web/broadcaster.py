@@ -1,10 +1,11 @@
-from typing import List, Dict, Any
+from typing import Any
+
 from fastapi import WebSocket
 
-active_clients: List[WebSocket] = []
+active_clients: list[WebSocket] = []
 
 
-async def broadcast_new_log(log_entry: Dict[str, Any]):
+async def broadcast_new_log(log_entry: dict[str, Any]):
     """
     Broadcast a new log entry to all connected WebSocket clients.
 
@@ -13,7 +14,7 @@ async def broadcast_new_log(log_entry: Dict[str, Any]):
     """
     if not active_clients:
         return
-        
+
     disconnected = []
     # Only show client count, not the full log entry
     print(f"[DEBUG] Broadcasting to {len(active_clients)} clients")

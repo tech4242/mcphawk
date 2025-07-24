@@ -1,6 +1,6 @@
+import json
 import socket
 import threading
-import json
 
 HOST = "127.0.0.1"
 PORT = 12345  # MCPHawk should sniff this port

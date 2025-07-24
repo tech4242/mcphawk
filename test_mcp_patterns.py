@@ -4,10 +4,11 @@ Test script to generate different MCP/JSON-RPC message patterns
 to test the new UI's message type detection.
 """
 
-import socket
 import json
-import time
+import socket
 import sys
+import time
+
 
 def send_message(sock, message):
     """Send a JSON-RPC message over the socket."""
@@ -19,14 +20,14 @@ def send_message(sock, message):
 def main():
     host = '127.0.0.1'
     port = 12345
-    
+
     print(f"Connecting to {host}:{port}...")
-    
+
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect((host, port))
             print("Connected! Sending test messages...\n")
-            
+
             # 1. Request-Response pattern
             print("=== Test 1: Request-Response Pattern ===")
             # Request
@@ -47,7 +48,7 @@ def main():
                     ]
                 }
             })
-            
+
             # 2. Notification pattern (no response expected)
             print("\n=== Test 2: Notification Pattern ===")
             send_message(sock, {
@@ -74,7 +75,7 @@ def main():
                     "message": "Processing complete!"
                 }
             })
-            
+
             # 3. Error response pattern
             print("\n=== Test 3: Error Response Pattern ===")
             # Request
@@ -96,7 +97,7 @@ def main():
                     "data": {"tool": "nonexistent_tool"}
                 }
             })
-            
+
             # 4. Multiple requests before responses (async pattern)
             print("\n=== Test 4: Async Pattern - Multiple Requests ===")
             # Send multiple requests
@@ -123,7 +124,7 @@ def main():
                 "id": 3,
                 "result": {"contents": "Data from file 1"}
             })
-            
+
             # 5. Server-initiated request pattern
             print("\n=== Test 5: Server-Initiated Request ===")
             send_message(sock, {
@@ -137,7 +138,7 @@ def main():
                     "maxTokens": 100
                 }
             })
-            
+
             # 6. Mixed patterns with progress notifications
             print("\n=== Test 6: Mixed Pattern - Request with Progress ===")
             # Initial request
@@ -167,10 +168,10 @@ def main():
                 "id": 5,
                 "result": {"status": "completed", "output": "Task finished!"}
             })
-            
+
             print("\n=== All test messages sent! ===")
             print("Check the MCPHawk UI to see how messages are displayed.")
-            
+
     except ConnectionRefusedError:
         print(f"Error: Could not connect to {host}:{port}")
         print("Make sure the dummy MCP server is running:")

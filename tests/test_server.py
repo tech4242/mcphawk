@@ -1,9 +1,11 @@
-import pytest
 import os
 import tempfile
+
+import pytest
 from fastapi.testclient import TestClient
-from mcphawk.web.server import app
+
 from mcphawk.logger import init_db, set_db_path
+from mcphawk.web.server import app
 
 # Use a separate test database for this module
 TEST_DB_PATH = os.path.join(tempfile.gettempdir(), "test_server_mcphawk.db")

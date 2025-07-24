@@ -1,7 +1,7 @@
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, UTC
-from typing import List, Dict, Any
+from typing import Any
 
 # Database file (shared with tests)
 DB_FILE = "mcphawk_logs.db"
@@ -19,7 +19,7 @@ def init_db() -> None:
     print(f"[DEBUG] init_db: Using DB_PATH = {DB_PATH}")
     if not DB_PATH or not str(DB_PATH).strip():
         raise ValueError("DB_PATH is not set or is empty")
-    
+
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute(
@@ -40,7 +40,7 @@ def init_db() -> None:
     conn.close()
 
 
-def log_message(entry: Dict[str, Any]) -> None:
+def log_message(entry: dict[str, Any]) -> None:
     """
     Insert a new log entry.
 
@@ -76,7 +76,7 @@ def log_message(entry: Dict[str, Any]) -> None:
     conn.close()
 
 
-def fetch_logs(limit: int = 100) -> List[Dict[str, Any]]:
+def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
     """
     Fetch the latest logs.
 
@@ -89,12 +89,12 @@ def fetch_logs(limit: int = 100) -> List[Dict[str, Any]]:
     # Ensure we're using the correct path
     current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
     print(f"[DEBUG] fetch_logs: Using DB_PATH = {current_path}, exists = {current_path.exists() if current_path else False}")
-    
+
     # If the database doesn't exist, it might have been deleted or path changed
     if not current_path.exists():
         print(f"[WARNING] Database file not found at {current_path}")
         return []
-    
+
     conn = sqlite3.connect(current_path)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()

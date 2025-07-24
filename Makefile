@@ -34,6 +34,16 @@ test:
 test-watch:
 	python -m pytest -v --watch
 
+# Linting
+lint:
+	ruff check .
+
+format:
+	ruff check . --fix
+
+format-unsafe:
+	ruff check . --fix --unsafe-fixes
+
 # Clean
 clean:
 	rm -rf frontend/node_modules

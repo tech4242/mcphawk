@@ -8,9 +8,11 @@ This ensures:
 
 import json
 import os
-from scapy.all import Ether, IP, TCP, Raw
+
+from scapy.all import IP, TCP, Ether, Raw
+
+from mcphawk.logger import clear_logs, fetch_logs, init_db, set_db_path
 from mcphawk.sniffer import packet_callback
-from mcphawk.logger import set_db_path, init_db, clear_logs, fetch_logs
 
 TEST_DB = "test_mcphawk_logs.db"
 
