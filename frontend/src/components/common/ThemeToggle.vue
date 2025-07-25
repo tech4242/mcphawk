@@ -10,18 +10,40 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { SunIcon, MoonIcon } from '@heroicons/vue/24/outline'
 
 const isDark = ref(false)
+let mediaQuery = null
 
 onMounted(() => {
-  // Check for saved theme preference, default to dark
+  // Check for saved theme preference or system preference
   const savedTheme = localStorage.getItem('theme')
+  mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
   
-  // Default to dark mode if no preference is saved
-  isDark.value = savedTheme ? savedTheme === 'dark' : true
+  // Use saved theme if available, otherwise use system preference
+  if (savedTheme) {
+    isDark.value = savedTheme === 'dark'
+  } else {
+    isDark.value = mediaQuery.matches
+  }
+  
   applyTheme()
+  
+  // Listen for system theme changes (only if user hasn't set a preference)
+  const handleSystemThemeChange = (e) => {
+    if (!localStorage.getItem('theme')) {
+      isDark.value = e.matches
+      applyTheme()
+    }
+  }
+  
+  mediaQuery.addEventListener('change', handleSystemThemeChange)
+  
+  // Cleanup on unmount
+  onUnmounted(() => {
+    mediaQuery.removeEventListener('change', handleSystemThemeChange)
+  })
 })
 
 function toggleTheme() {
