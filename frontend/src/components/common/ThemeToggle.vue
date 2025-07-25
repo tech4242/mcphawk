@@ -16,11 +16,11 @@ import { SunIcon, MoonIcon } from '@heroicons/vue/24/outline'
 const isDark = ref(false)
 
 onMounted(() => {
-  // Check for saved theme preference or system preference
+  // Check for saved theme preference, default to dark
   const savedTheme = localStorage.getItem('theme')
-  const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
   
-  isDark.value = savedTheme === 'dark' || (!savedTheme && systemDark)
+  // Default to dark mode if no preference is saved
+  isDark.value = savedTheme ? savedTheme === 'dark' : true
   applyTheme()
 })
 
