@@ -23,7 +23,7 @@
             <td class="px-4 py-3 text-left text-sm text-gray-900 dark:text-gray-100 font-mono truncate">
               {{ messageSummary }}
             </td>
-            <td class="px-4 py-3 text-left w-20 text-sm text-gray-500 dark:text-gray-400 font-mono">
+            <td class="px-4 py-3 text-left w-32 text-sm text-gray-500 dark:text-gray-400 font-mono">
               {{ log.traffic_type || 'N/A' }}
             </td>
             <td class="px-4 py-3 text-left w-48 text-sm text-gray-500 dark:text-gray-400">

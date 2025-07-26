@@ -43,6 +43,12 @@
                     <MessageTypeBadge :type="messageType" class="ml-2" />
                   </div>
                   <div>
+                    <span class="text-gray-500 dark:text-gray-400">Traffic:</span>
+                    <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
+                      {{ logStore.selectedLog.traffic_type || 'N/A' }}
+                    </span>
+                  </div>
+                  <div>
                     <span class="text-gray-500 dark:text-gray-400">Source:</span>
                     <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
                       {{ logStore.selectedLog.src_ip }}:{{ logStore.selectedLog.src_port }}
