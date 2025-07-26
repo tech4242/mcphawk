@@ -197,3 +197,4 @@ Vote for features by opening a GitHub issue!
 - [ ] **Interactive Replay** - Click any request to re-send it, edit and replay captured messages
 - [ ] **Real-time Alerts** - Alert on specific methods or error patterns with webhook support
 - [ ] **Visualization** - Sequence diagrams, resource heat maps, method dependency graphs
+- [ ] **MCP Server Interface** - Expose captured traffic via MCP server for AI agents to query and analyze traffic patterns
