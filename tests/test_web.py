@@ -23,9 +23,13 @@ client = TestClient(app)
 TEST_DB_PATH = os.path.join(tempfile.gettempdir(), "test_web_mcphawk.db")
 
 
-@pytest.fixture(autouse=True, scope="module")
+@pytest.fixture(scope="module")
 def setup_test_db():
     """Set up test database for all tests in this module."""
+    # Save original DB path
+    import mcphawk.logger as logger_module
+    original_path = logger_module.DB_PATH
+
     set_db_path(TEST_DB_PATH)
     init_db()
     yield
@@ -33,9 +37,12 @@ def setup_test_db():
     if os.path.exists(TEST_DB_PATH):
         os.remove(TEST_DB_PATH)
 
+    # Restore original DB path
+    logger_module.DB_PATH = original_path
+
 
 @pytest.fixture(autouse=True)
-def clean_db():
+def clean_db(setup_test_db):
     """
     Ensure the database is cleared before each test.
     """
@@ -48,7 +55,7 @@ def clean_db():
     yield
 
 
-def test_get_logs_limit():
+def test_get_logs_limit(setup_test_db):
     """
     Ensure /logs returns valid JSON and respects the limit parameter.
     """
@@ -80,7 +87,7 @@ def test_get_logs_limit():
     assert "jsonrpc" in data[0]["message"]
 
 
-def test_get_logs_multiple():
+def test_get_logs_multiple(setup_test_db):
     """
     Ensure /logs can return multiple rows when more logs are inserted.
     """
@@ -111,7 +118,7 @@ def test_get_logs_multiple():
 
 
 @pytest.mark.asyncio
-async def test_websocket_broadcast():
+async def test_websocket_broadcast(setup_test_db):
     """
     Ensure that new log entries are broadcast to connected WebSocket clients.
     """
@@ -135,14 +142,14 @@ async def test_websocket_broadcast():
         assert data["method"] == "testMethod"
 
 
-def test_empty_database_returns_empty_list():
+def test_empty_database_returns_empty_list(setup_test_db):
     """Test that /logs returns empty list when database is empty."""
     response = client.get("/logs?limit=10")
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_logs_persist_across_requests():
+def test_logs_persist_across_requests(setup_test_db):
     """Test that logs persist between different API requests."""
     # Add a log
     log_message({
@@ -170,7 +177,7 @@ def test_logs_persist_across_requests():
     assert data1[0]["message"] == data2[0]["message"]
 
 
-def test_logs_order_newest_first():
+def test_logs_order_newest_first(setup_test_db):
     """Test that logs are returned in reverse chronological order."""
     import time
 
@@ -198,7 +205,7 @@ def test_logs_order_newest_first():
     assert "order0" in data[2]["message"]
 
 
-def test_logs_default_limit():
+def test_logs_default_limit(setup_test_db):
     """Test that default limit of 50 is applied."""
     # Add 60 logs
     for i in range(60):
@@ -219,7 +226,7 @@ def test_logs_default_limit():
     assert len(data) == 50
 
 
-def test_log_fields_preserved_in_api():
+def test_log_fields_preserved_in_api(setup_test_db):
     """Test that all log fields are preserved through the API."""
     test_entry = {
         "timestamp": datetime.now(timezone.utc),

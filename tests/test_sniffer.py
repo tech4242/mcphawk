@@ -18,9 +18,13 @@ TEST_DB_DIR = "tests/test_logs"
 TEST_DB = os.path.join(TEST_DB_DIR, "test_mcp_sniffer_logs.db")
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="module")
 def clean_db():
     """Prepare a clean SQLite DB for tests."""
+    # Save original DB path
+    import mcphawk.logger as logger_module
+    original_path = logger_module.DB_PATH
+
     os.makedirs(TEST_DB_DIR, exist_ok=True)
     if os.path.exists(TEST_DB):
         os.remove(TEST_DB)
@@ -28,6 +32,9 @@ def clean_db():
     set_db_path(TEST_DB)
     init_db()
     yield
+
+    # Restore original DB path
+    logger_module.DB_PATH = original_path
 
 
 @pytest.fixture(scope="module")
@@ -60,7 +67,7 @@ def dummy_server():
     yield host, port
 
 
-def test_packet_callback(dummy_server):
+def test_packet_callback(clean_db, dummy_server):
     """Simulate sending an MCP-like JSON-RPC packet and verify it's logged."""
     host, port = dummy_server
 

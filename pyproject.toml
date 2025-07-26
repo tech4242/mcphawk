@@ -85,4 +85,8 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "tests/*.py" = ["S101", "E712"]
 
 [tool.coverage.run]
-omit = ["mcphawk/models.py"]
+omit = [
+    "mcphawk/models.py",
+    "examples/*",
+    "*/examples/*",
+]
