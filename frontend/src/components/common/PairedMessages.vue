@@ -2,7 +2,7 @@
   <div v-if="pairedMessages.length > 0" :class="containerClass">
     <div :class="headerClass">
       <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-        Paired {{ pairedMessages.length === 1 ? 'Message' : 'Messages' }} (same JSON-RPC ID)
+        Paired {{ pairedMessages.length === 1 ? 'Message' : 'Messages' }} (same connection & ID)
       </span>
     </div>
     <div :class="contentClass">
@@ -51,9 +51,20 @@ const pairedMessages = computed(() => {
     const parsed = JSON.parse(props.currentLog.message)
     if (!parsed.id) return []
     
-    // Find all messages with the same JSON-RPC ID, excluding the current one
+    // Find all messages with the same JSON-RPC ID AND same connection endpoints
     return props.allLogs.filter(log => {
       if (log === props.currentLog) return false
+      
+      // Check if it's the same connection (either direction)
+      const sameConnection = (
+        (log.src_ip === props.currentLog.src_ip && log.src_port === props.currentLog.src_port &&
+         log.dst_ip === props.currentLog.dst_ip && log.dst_port === props.currentLog.dst_port) ||
+        (log.src_ip === props.currentLog.dst_ip && log.src_port === props.currentLog.dst_port &&
+         log.dst_ip === props.currentLog.src_ip && log.dst_port === props.currentLog.src_port)
+      )
+      
+      if (!sameConnection) return false
+      
       try {
         const otherParsed = JSON.parse(log.message)
         return otherParsed.id === parsed.id
