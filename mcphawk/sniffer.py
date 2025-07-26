@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 # Suppress Scapy warnings before importing
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
-from scapy.all import IP, TCP, Raw, conf, sniff  # noqa: E402
+from scapy.all import IP, TCP, IPv6, Raw, conf, sniff  # noqa: E402
 
 from mcphawk.logger import log_message  # noqa: E402
 from mcphawk.web.broadcaster import broadcast_new_log  # noqa: E402
@@ -48,9 +48,15 @@ def packet_callback(pkt):
             logger.debug(f"Raw payload: {raw_payload[:60]}...")
 
         # First, try to process as WebSocket traffic
-        if pkt.haslayer(TCP) and pkt.haslayer(IP):
-            src_ip = pkt[IP].src
-            dst_ip = pkt[IP].dst
+        if pkt.haslayer(TCP) and (pkt.haslayer(IP) or pkt.haslayer(IPv6)):
+            # Get IP addresses (IPv4 or IPv6)
+            if pkt.haslayer(IP):
+                src_ip = pkt[IP].src
+                dst_ip = pkt[IP].dst
+            else:  # IPv6
+                src_ip = pkt[IPv6].src
+                dst_ip = pkt[IPv6].dst
+
             src_port = pkt[TCP].sport
             dst_port = pkt[TCP].dport
 
@@ -111,6 +117,7 @@ def packet_callback(pkt):
                         "dst_port": dst_port,
                         "direction": "unknown",
                         "message": msg,
+                        "traffic_type": "TCP/WS",
                     }
 
                     log_message(entry)
@@ -120,9 +127,9 @@ def packet_callback(pkt):
                     broadcast_entry["timestamp"] = ts.isoformat()
                     _broadcast_in_any_loop(broadcast_entry)
 
-                # If we processed WebSocket frames, return early
-                if messages:
-                    return
+                # If this was identified as WebSocket traffic, return early
+                # even if no complete messages were extracted (could be buffering)
+                return
 
         # Otherwise, try to process as raw JSON-RPC
         try:
@@ -138,14 +145,26 @@ def packet_callback(pkt):
                 if _auto_detect_mode:
                     print(f"[MCPHawk] Detected MCP traffic on port {src_port} -> {dst_port}")
 
+                # Get IP addresses
+                if pkt.haslayer(IP):
+                    src_ip = pkt[IP].src
+                    dst_ip = pkt[IP].dst
+                elif pkt.haslayer(IPv6):
+                    src_ip = pkt[IPv6].src
+                    dst_ip = pkt[IPv6].dst
+                else:
+                    src_ip = ""
+                    dst_ip = ""
+
                 entry = {
                     "timestamp": ts,
-                    "src_ip": pkt[IP].src if pkt.haslayer(IP) else "",
+                    "src_ip": src_ip,
                     "src_port": src_port,
-                    "dst_ip": pkt[IP].dst if pkt.haslayer(IP) else "",
+                    "dst_ip": dst_ip,
                     "dst_port": dst_port,
                     "direction": "unknown",
                     "message": decoded,
+                    "traffic_type": "TCP/Direct",
                 }
 
                 log_message(entry)

@@ -36,10 +36,17 @@ def init_db() -> None:
             src_port INTEGER,
             dst_port INTEGER,
             direction TEXT CHECK(direction IN ('incoming', 'outgoing', 'unknown')),
-            message TEXT
+            message TEXT,
+            traffic_type TEXT
         )
         """
     )
+
+    # Add traffic_type column to existing tables
+    cur.execute("PRAGMA table_info(logs)")
+    columns = [col[1] for col in cur.fetchall()]
+    if "traffic_type" not in columns:
+        cur.execute("ALTER TABLE logs ADD COLUMN traffic_type TEXT")
     conn.commit()
     conn.close()
 
@@ -57,14 +64,15 @@ def log_message(entry: dict[str, Any]) -> None:
             dst_port (int)
             direction (str): 'incoming', 'outgoing', or 'unknown'
             message (str)
+            traffic_type (str): 'TCP', 'WS', or 'N/A' (optional, defaults to 'N/A')
     """
     timestamp = entry.get("timestamp", datetime.now(tz=timezone.utc))
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO logs (timestamp, src_ip, dst_ip, src_port, dst_port, direction, message)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO logs (timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             timestamp.isoformat(),
@@ -74,6 +82,7 @@ def log_message(entry: dict[str, Any]) -> None:
             entry.get("dst_port"),
             entry.get("direction", "unknown"),
             entry.get("message"),
+            entry.get("traffic_type", "N/A"),
         ),
     )
     conn.commit()
@@ -104,7 +113,7 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT timestamp, src_ip, dst_ip, src_port, dst_port, direction, message
+        SELECT timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type
         FROM logs
         ORDER BY id DESC
         LIMIT ?
@@ -123,6 +132,7 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
             "dst_port": row["dst_port"],
             "direction": row["direction"],
             "message": row["message"],
+            "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
         }
         for row in rows
     ]

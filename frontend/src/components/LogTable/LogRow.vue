@@ -1,6 +1,6 @@
 <template>
   <tr>
-    <td colspan="5" class="p-0">
+    <td colspan="7" class="p-0">
       <div 
         class="cursor-pointer transition-all relative"
         :class="{
@@ -11,6 +11,9 @@
       >
         <table class="w-full table-fixed">
           <tr>
+            <td class="px-4 py-3 text-left w-24 text-sm text-gray-900 dark:text-gray-100">
+              {{ formatDate(log.timestamp) }}
+            </td>
             <td class="px-4 py-3 text-left w-32 text-sm text-gray-900 dark:text-gray-100">
               {{ formatTimestamp(log.timestamp) }}
             </td>
@@ -19,6 +22,9 @@
             </td>
             <td class="px-4 py-3 text-left text-sm text-gray-900 dark:text-gray-100 font-mono truncate">
               {{ messageSummary }}
+            </td>
+            <td class="px-4 py-3 text-left w-20 text-sm text-gray-500 dark:text-gray-400 font-mono">
+              {{ log.traffic_type || 'N/A' }}
             </td>
             <td class="px-4 py-3 text-left w-48 text-sm text-gray-500 dark:text-gray-400">
               <div class="flex items-center">
@@ -52,7 +58,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { getMessageType, getMessageSummary, formatTimestamp, getPortInfo, getDirectionIcon } from '@/utils/messageParser'
+import { getMessageType, getMessageSummary, formatTimestamp, formatDate, getPortInfo, getDirectionIcon } from '@/utils/messageParser'
 import MessageTypeBadge from './MessageTypeBadge.vue'
 import PairedMessages from '@/components/common/PairedMessages.vue'
 

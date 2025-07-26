@@ -43,7 +43,8 @@ def get_logs(limit: int = 50):
     return JSONResponse(content=[
         {
             **log,
-            "timestamp": log["timestamp"].isoformat()  # ensure JSON-friendly
+            "timestamp": log["timestamp"].isoformat(),  # ensure JSON-friendly
+            "traffic_type": log.get("traffic_type", "N/A")  # ensure traffic_type is included
         }
         for log in logs
     ])

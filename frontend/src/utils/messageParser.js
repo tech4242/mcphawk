@@ -57,6 +57,14 @@ export function formatTimestamp(timestamp) {
   })
 }
 
+export function formatDate(timestamp) {
+  const date = new Date(timestamp)
+  const day = date.getDate().toString().padStart(2, '0')
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}:${month}:${year}`
+}
+
 export function getMessageSummary(message) {
   const parsed = parseMessage(message)
   if (!parsed) return 'Invalid JSON'

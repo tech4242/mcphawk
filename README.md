@@ -13,7 +13,7 @@
 
 MCPHawk is a passive sniffer for **Model Context Protocol (MCP)** traffic, similar to Wireshark but MCP-focused.
 
-It captures JSON-RPC traffic between MCP clients and WebSocket/TCP-based MCP servers. MCPHawk can reconstruct full JSON-RPC messages from raw TCP traffic without requiring a handshake.
+It captures JSON-RPC traffic between MCP clients and WebSocket/TCP-based MCP servers (IPv4 and IPv6). MCPHawk can reconstruct full JSON-RPC messages from raw TCP traffic without requiring a handshake.
 
 ## What it is
 Passive network sniffer for MCP/JSON-RPC traffic (like Wireshark, but protocol-focused).
