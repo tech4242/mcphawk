@@ -99,6 +99,12 @@ python -m pytest -v
 
 ## Usage
 
+### Requirements
+
+- **macOS/Linux**: Requires `sudo` for packet capture (standard for network sniffers)
+- **Python**: 3.9 or higher
+- **Permissions**: Must run with elevated privileges to access network interfaces
+
 ### Quick Start
 
 ```bash
@@ -109,8 +115,8 @@ mcphawk --help
 mcphawk sniff --help
 mcphawk web --help
 
-# Start web UI with auto-detect mode
-mcphawk web --auto-detect
+# Start web UI with auto-detect mode (requires sudo on macOS)
+sudo mcphawk web --auto-detect
 
 # Monitor MCP traffic on a specific port (console output)
 mcphawk sniff --port 3000
@@ -198,3 +204,38 @@ Vote for features by opening a GitHub issue!
 - [ ] **Real-time Alerts** - Alert on specific methods or error patterns with webhook support
 - [ ] **Visualization** - Sequence diagrams, resource heat maps, method dependency graphs
 - [ ] **MCP Server Interface** - Expose captured traffic via MCP server for AI agents to query and analyze traffic patterns
+
+## Platform Support
+
+### Tested Platforms
+- ✅ **macOS** (Apple Silicon & Intel) - Fully tested
+- ✅ **Linux** (Ubuntu, Debian) - Fully tested  
+- ⚠️  **Windows** - Experimental (Scapy should work but untested)
+
+### Known Limitations
+
+**v0.1.0 Release Notes:**
+- Requires elevated privileges (`sudo`) on macOS/Linux for packet capture
+- Limited to localhost/loopback interface monitoring
+- WebSocket capture requires traffic to be uncompressed
+- IPv6 support requires explicit interface configuration on some systems
+- High traffic volumes (>1000 msgs/sec) may impact performance
+
+### Troubleshooting
+
+**Permission Denied Error:**
+```bash
+# On macOS/Linux, use sudo:
+sudo mcphawk web --auto-detect
+```
+
+**No Traffic Captured:**
+- Ensure the MCP server/client is using localhost (127.0.0.1 or ::1)
+- Check if traffic is on the expected port
+- Try auto-detect mode to find MCP traffic: `--auto-detect`
+- On macOS, ensure you're allowing the terminal to capture packets in System Preferences
+
+**WebSocket Traffic Not Showing:**
+- Verify the WebSocket connection is uncompressed
+- Check if the server is using IPv6 (::1) - MCPHawk supports both IPv4 and IPv6
+- Ensure the WebSocket frames contain valid JSON-RPC messages
