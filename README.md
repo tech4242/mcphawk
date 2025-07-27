@@ -44,23 +44,29 @@ Non-exhaustive list:
   - filtering 
   - always see if WS connection is up for live updates
 
-## mcpinspector vs. MCPHawk
+## Comparison with Similar Tools
 
-If you want to observe all MCP traffic between any processes, MCPHawk offers unique value as a passive sniffer that mcpinspector does not. If you want to actively test servers, mcpinspector is better. For many workflows, they are complementary tools.
+| Feature                                      | MCPHawk | mcpinspector | Wireshark |
+|-----------------------------------------------|:---------:|:------------:|:---------:|
+| Passive sniffing (no proxy needed)            |     ✅     |      ❌       |     ✅     |
+| MCP/JSON-RPC protocol awareness               |     ✅     |      ✅       |     ❌     |
+| Auto-detect MCP traffic on any port           |     ✅     |      ❌       |     ❌     |
+| Web UI for live/historical traffic            |     ✅     |      ✅       |     ❌     |
+| Can capture any traffic (not just via proxy)  |     ✅     |      ❌       |     ✅     |
+| JSON-RPC message type detection               |     ✅     |      ❌       |     ❌     |
+| Message filtering by type                     |     ✅     |      ❌       |     ❌     |
+| Console-only mode (no web UI needed)          |     ✅     |      ❌       |     ✅     |
+| Manual request crafting/testing               |     ❌     |      ✅       |     ❌     |
+| Interactive tool/prompt testing               |     ❌     |      ✅       |     ❌     |
+| Proxy/bridge between client/server            |     ❌     |      ✅       |     ❌     |
+| No client/server config changes required      |     ✅     |      ❌       |     ✅     |
+| General protocol analysis                     |     ❌     |      ❌       |     ✅     |
+| MCP-specific features                         |     ✅     |      ✅       |     ❌     |
 
-| Feature                                      | MCPHawk | mcpinspector |
-|-----------------------------------------------|:---------:|:------------:|
-| Passive sniffing (no proxy needed)            |     ✅     |      ❌       |
-| Auto-detect MCP traffic on any port           |     ✅     |      ❌       |
-| Web UI for live/historical traffic            |     ✅     |      ✅       |
-| Can capture any traffic (not just via proxy)  |     ✅     |      ❌       |
-| JSON-RPC message type detection               |     ✅     |      ❌       |
-| Message filtering by type                     |     ✅     |      ❌       |
-| Console-only mode (no web UI needed)          |     ✅     |      ❌       |
-| Manual request crafting/testing               |     ❌     |      ✅       |
-| Interactive tool/prompt testing               |     ❌     |      ✅       |
-| Proxy/bridge between client/server            |     ❌     |      ✅       |
-| No client/server config changes required      |     ✅     |      ❌       |
+**When to use each tool:**
+- **MCPHawk**: Best for passively monitoring MCP traffic, debugging live connections, understanding protocol flow
+- **mcpinspector**: Best for actively testing MCP servers, crafting custom requests, interactive debugging
+- **Wireshark**: Best for general network analysis, non-MCP protocols, deep packet inspection
 
 ## Installation
 
