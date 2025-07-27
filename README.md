@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="tests/mcphawk_logo.png" alt="MCPHawk Logo" height="130">
+  <img src="examples/branding/mcphawk_logo.png" alt="MCPHawk Logo" height="130">
   
   [![CI](https://github.com/tech4242/mcphawk/actions/workflows/ci.yml/badge.svg)](https://github.com/tech4242/mcphawk/actions/workflows/ci.yml)
   [![codecov](https://codecov.io/gh/tech4242/mcphawk/branch/main/graph/badge.svg)](https://codecov.io/gh/tech4242/mcphawk)
@@ -16,6 +16,8 @@ MCPHawk is a passive sniffer for **Model Context Protocol (MCP)** traffic, simil
 - It captures JSON-RPC traffic between MCP clients and WebSocket/TCP-based MCP servers (IPv4 and IPv6) e.g. from any tool, agent, or LLM
 - MCPHawk can reconstruct full JSON-RPC messages from raw TCP traffic without requiring a handshake. 
 - It captures traffic "on the wire" between any MCP client and server—does not require client/server modification. 
+
+<img src="examples/branding/mcphawk_screenshot.png" alt="MCPHawk Logo" width="100%">
 
 ## Features
 
@@ -36,6 +38,11 @@ Non-exhaustive list:
 - **Real-time statistics** - message counts by type
 - **Console-only mode** - use `mcphawk sniff` for terminal output without web UI
 - **Historical log viewing** - use `mcphawk web --no-sniffer` to view past captures without active sniffing
+- **Chill UX** 
+  - dark mode 🌝
+  - expand mode to directly see JSON withtout detailed view
+  - filtering 
+  - always see if WS connection is up for live updates
 
 ## mcpinspector vs. MCPHawk
 
