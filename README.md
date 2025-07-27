@@ -15,7 +15,7 @@ MCPHawk is a passive sniffer for **Model Context Protocol (MCP)** traffic, simil
 
 - It captures JSON-RPC traffic between MCP clients and WebSocket/TCP-based MCP servers (IPv4 and IPv6) e.g. from any tool, agent, or LLM
 - MCPHawk can reconstruct full JSON-RPC messages from raw TCP traffic without requiring a handshake. 
-- It captures traffic "on the wire" between any MCP client and server—does not require client/server modification. 
+- It captures traffic "on the wire" between any MCP client and server—does not require client/server modification.
 
 <img src="examples/branding/mcphawk_screenshot.png" alt="MCPHawk Logo" width="100%">
 
@@ -67,6 +67,24 @@ Non-exhaustive list:
 - **MCPHawk**: Best for passively monitoring MCP traffic, debugging live connections, understanding protocol flow
 - **mcpinspector**: Best for actively testing MCP servers, crafting custom requests, interactive debugging
 - **Wireshark**: Best for general network analysis, non-MCP protocols, deep packet inspection
+
+## TLS/HTTPS Limitations
+
+MCPHawk captures **unencrypted** MCP traffic only. It cannot decrypt:
+- HTTPS/WSS (WebSocket Secure) connections
+- TLS-encrypted TCP connections
+- Any SSL/TLS encrypted traffic
+
+**This tool is ideal for:**
+- 🛠️ **Local MCP development** - Debug your MCP server implementations
+- 🔍 **Understanding MCP protocol** - See actual JSON-RPC message flow
+- 🐛 **Troubleshooting local tools** - Monitor Claude Desktop, Cline, etc. with YOUR local MCP servers
+- 📊 **Development/staging environments** - Where TLS is often disabled
+
+**Not suitable for:**
+- Production traffic analysis (usually encrypted)
+- Cloud MCP services (HTTPS/WSS)
+- Third-party MCP servers with TLS 
 
 ## Installation
 
@@ -175,6 +193,10 @@ Vote for features by opening a GitHub issue!
 - [ ] **Real-time Alerts** - Alert on specific methods or error patterns with webhook support
 - [ ] **Visualization** - Sequence diagrams, resource heat maps, method dependency graphs
 - [ ] **MCP Server Interface** - Expose captured traffic via MCP server for AI agents to query and analyze traffic patterns
+
+... and a few more off the deep end:
+- [ ] **TLS/HTTPS Support (MITM Proxy Mode)** - Optional man-in-the-middle proxy with certificate installation for encrypted traffic
+- [ ] **External Decryption Integration** - Import decrypted streams from Wireshark, Chrome DevTools, or SSLKEYLOGFILE
 
 ## For Developers
 
