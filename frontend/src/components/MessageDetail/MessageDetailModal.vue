@@ -41,6 +41,11 @@
                   <div>
                     <span class="text-gray-500 dark:text-gray-400">Type:</span>
                     <MessageTypeBadge :type="messageType" class="ml-2" />
+                    <span v-if="isMcpHawkTraffic" 
+                          class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                          title="MCPHawk's own MCP traffic">
+                      MCP🦅
+                    </span>
                   </div>
                   <div>
                     <span class="text-gray-500 dark:text-gray-400">Traffic:</span>
@@ -133,6 +138,16 @@ const formattedJson = computed(() => {
   if (!logStore.selectedLog) return ''
   const parsed = parseMessage(logStore.selectedLog.message)
   return JSON.stringify(parsed, null, 2)
+})
+
+const isMcpHawkTraffic = computed(() => {
+  if (!logStore.selectedLog?.metadata) return false
+  try {
+    const meta = JSON.parse(logStore.selectedLog.metadata)
+    return meta.source === 'mcphawk-mcp'
+  } catch {
+    return false
+  }
 })
 
 async function copyToClipboard() {

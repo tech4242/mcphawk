@@ -17,8 +17,15 @@
             <td class="px-4 py-3 text-left w-32 text-sm text-gray-900 dark:text-gray-100">
               {{ formatTimestamp(log.timestamp) }}
             </td>
-            <td class="px-4 py-3 text-left w-28">
-              <MessageTypeBadge :type="messageType" />
+            <td class="px-4 py-3 text-left w-40">
+              <div class="flex items-center gap-2 whitespace-nowrap">
+                <MessageTypeBadge :type="messageType" />
+                <span v-if="isMcpHawkTraffic" 
+                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                      title="MCPHawk's own MCP traffic">
+                  MCP🦅
+                </span>
+              </div>
             </td>
             <td class="px-4 py-3 text-left text-sm text-gray-900 dark:text-gray-100 font-mono truncate">
               {{ messageSummary }}
@@ -94,6 +101,16 @@ const formattedJson = computed(() => {
     return JSON.stringify(parsed, null, 2)
   } catch {
     return props.log.message
+  }
+})
+
+const isMcpHawkTraffic = computed(() => {
+  if (!props.log.metadata) return false
+  try {
+    const meta = JSON.parse(props.log.metadata)
+    return meta.source === 'mcphawk-mcp'
+  } catch {
+    return false
   }
 })
 

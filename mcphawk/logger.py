@@ -37,16 +37,19 @@ def init_db() -> None:
             dst_port INTEGER,
             direction TEXT CHECK(direction IN ('incoming', 'outgoing', 'unknown')),
             message TEXT,
-            traffic_type TEXT
+            traffic_type TEXT,
+            metadata TEXT
         )
         """
     )
 
-    # Add traffic_type column to existing tables
+    # Add traffic_type and metadata columns to existing tables
     cur.execute("PRAGMA table_info(logs)")
     columns = [col[1] for col in cur.fetchall()]
     if "traffic_type" not in columns:
         cur.execute("ALTER TABLE logs ADD COLUMN traffic_type TEXT")
+    if "metadata" not in columns:
+        cur.execute("ALTER TABLE logs ADD COLUMN metadata TEXT")
     conn.commit()
     conn.close()
 
@@ -66,6 +69,7 @@ def log_message(entry: dict[str, Any]) -> None:
             direction (str): 'incoming', 'outgoing', or 'unknown'
             message (str)
             traffic_type (str): 'TCP', 'WS', or 'N/A' (optional, defaults to 'N/A')
+            metadata (str): JSON string with additional metadata (optional)
     """
     timestamp = entry.get("timestamp", datetime.now(tz=timezone.utc))
     log_id = entry.get("log_id")
@@ -76,8 +80,8 @@ def log_message(entry: dict[str, Any]) -> None:
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type, metadata)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             log_id,
@@ -89,6 +93,7 @@ def log_message(entry: dict[str, Any]) -> None:
             entry.get("direction", "unknown"),
             entry.get("message"),
             entry.get("traffic_type", "N/A"),
+            entry.get("metadata"),
         ),
     )
     conn.commit()
@@ -119,7 +124,7 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type, metadata
         FROM logs
         ORDER BY timestamp DESC
         LIMIT ?
@@ -140,6 +145,7 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
             "direction": row["direction"],
             "message": row["message"],
             "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
+            "metadata": row["metadata"],
         }
         for row in rows
     ]
@@ -190,7 +196,7 @@ def get_log_by_id(log_id: str) -> dict[str, Any] | None:
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type, metadata
         FROM logs
         WHERE log_id = ?
         """,
@@ -212,4 +218,5 @@ def get_log_by_id(log_id: str) -> dict[str, Any] | None:
         "direction": row["direction"],
         "message": row["message"],
         "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
+        "metadata": row["metadata"],
     }

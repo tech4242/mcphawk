@@ -64,16 +64,24 @@ def sniff(
     # Start MCP server if requested
     mcp_thread = None
     excluded_ports = []
+    mcphawk_mcp_ports = []
     if with_mcp:
         server = MCPHawkServer()
 
         if mcp_transport == "http":
             logger.info(f"Starting MCP HTTP server on http://localhost:{mcp_port}/mcp")
-            excluded_ports = [mcp_port]  # Exclude MCP port from sniffing
+            # Only exclude MCP port if not in debug mode
+            if not debug:
+                excluded_ports = [mcp_port]
+            else:
+                logger.info("Debug mode: HTTP MCP traffic will be captured and tagged")
+                mcphawk_mcp_ports = [mcp_port]
             def run_mcp():
                 asyncio.run(server.run_http(port=mcp_port))
         else:
             logger.info("Starting MCP server on stdio (configure in your MCP client)")
+            if debug:
+                logger.info("Note: stdio MCP traffic cannot be captured (use HTTP transport for debugging)")
             def run_mcp():
                 asyncio.run(server.run_stdio())
 
@@ -88,7 +96,8 @@ def sniff(
             filter_expr=filter_expr,
             auto_detect=auto_detect,
             debug=debug,
-            excluded_ports=excluded_ports
+            excluded_ports=excluded_ports,
+            mcphawk_mcp_ports=mcphawk_mcp_ports
         )
     except KeyboardInterrupt:
         logger.info("Sniffer stopped.")
@@ -139,16 +148,24 @@ def web(
     # Start MCP server if requested
     mcp_thread = None
     excluded_ports = []
+    mcphawk_mcp_ports = []
     if with_mcp:
         server = MCPHawkServer()
 
         if mcp_transport == "http":
             logger.info(f"Starting MCP HTTP server on http://localhost:{mcp_port}/mcp")
-            excluded_ports = [mcp_port]  # Exclude MCP port from sniffing
+            # Only exclude MCP port if not in debug mode
+            if not debug:
+                excluded_ports = [mcp_port]
+            else:
+                logger.info("Debug mode: HTTP MCP traffic will be captured and tagged")
+                mcphawk_mcp_ports = [mcp_port]
             def run_mcp():
                 asyncio.run(server.run_http(port=mcp_port))
         else:
             logger.info("Starting MCP server on stdio (configure in your MCP client)")
+            if debug:
+                logger.info("Note: stdio MCP traffic cannot be captured (use HTTP transport for debugging)")
             def run_mcp():
                 asyncio.run(server.run_stdio())
 
@@ -163,7 +180,8 @@ def web(
         auto_detect=auto_detect,
         debug=debug,
         excluded_ports=excluded_ports,
-        with_mcp=with_mcp
+        with_mcp=with_mcp,
+        mcphawk_mcp_ports=mcphawk_mcp_ports
     )
 
 

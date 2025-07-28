@@ -13,10 +13,24 @@ export const useLogStore = defineStore('logs', () => {
   const loading = ref(false)
   const error = ref(null)
   const expandAll = ref(false)
+  const showMcpHawkTraffic = ref(false)
 
   // Computed
   const filteredLogs = computed(() => {
     let result = logs.value
+
+    // Filter out MCPHawk's own traffic if toggle is off
+    if (!showMcpHawkTraffic.value) {
+      result = result.filter(log => {
+        if (!log.metadata) return true
+        try {
+          const meta = JSON.parse(log.metadata)
+          return meta.source !== 'mcphawk-mcp'
+        } catch {
+          return true
+        }
+      })
+    }
 
     // Apply type filter
     if (filter.value !== 'all') {
@@ -43,7 +57,8 @@ export const useLogStore = defineStore('logs', () => {
       requests: 0,
       responses: 0,
       notifications: 0,
-      errors: 0
+      errors: 0,
+      mcphawk: 0
     }
 
     logs.value.forEach(log => {
@@ -52,6 +67,16 @@ export const useLogStore = defineStore('logs', () => {
       else if (msgType === 'response') stats.responses++
       else if (msgType === 'notification') stats.notifications++
       else if (msgType === 'error') stats.errors++
+      
+      // Count MCPHawk's own traffic
+      if (log.metadata) {
+        try {
+          const meta = JSON.parse(log.metadata)
+          if (meta.source === 'mcphawk-mcp') stats.mcphawk++
+        } catch {
+          // ignore parse errors
+        }
+      }
     })
 
     return stats
@@ -131,6 +156,10 @@ export const useLogStore = defineStore('logs', () => {
     expandAll.value = !expandAll.value
   }
 
+  function toggleMcpHawkTraffic() {
+    showMcpHawkTraffic.value = !showMcpHawkTraffic.value
+  }
+
   return {
     // State
     logs,
@@ -141,6 +170,7 @@ export const useLogStore = defineStore('logs', () => {
     loading,
     error,
     expandAll,
+    showMcpHawkTraffic,
     
     // Computed
     filteredLogs,
@@ -156,6 +186,7 @@ export const useLogStore = defineStore('logs', () => {
     setFilter,
     setSearchQuery,
     togglePairing,
-    toggleExpandAll
+    toggleExpandAll,
+    toggleMcpHawkTraffic
   }
 })

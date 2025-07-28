@@ -38,6 +38,9 @@ _auto_detect_mode = False
 # Global variable to track excluded ports
 _excluded_ports = set()
 
+# Global variable to track MCPHawk's own MCP server ports for metadata tagging
+_mcphawk_mcp_ports = set()
+
 # Track established WebSocket connections
 _ws_connections = set()
 
@@ -131,6 +134,10 @@ def packet_callback(pkt):
                         "message": msg,
                         "traffic_type": "TCP/WS",
                     }
+                    
+                    # Add metadata if this is MCPHawk's own MCP traffic
+                    if src_port in _mcphawk_mcp_ports or dst_port in _mcphawk_mcp_ports:
+                        entry["metadata"] = '{"source": "mcphawk-mcp"}'
 
                     log_message(entry)
 
@@ -143,9 +150,20 @@ def packet_callback(pkt):
                 # even if no complete messages were extracted (could be buffering)
                 return
 
-        # Otherwise, try to process as raw JSON-RPC
+        # Otherwise, try to process as raw JSON-RPC or HTTP POST with JSON-RPC
         try:
             decoded = raw_payload.decode("utf-8", errors="ignore")
+            
+            # Check for HTTP request/response with JSON-RPC content
+            if (decoded.startswith("POST") or decoded.startswith("HTTP/1.1")) and "\r\n\r\n" in decoded:
+                # Extract JSON body from HTTP request/response
+                body_start = decoded.find("\r\n\r\n") + 4
+                json_body = decoded[body_start:]
+                if json_body.startswith("{") and "jsonrpc" in json_body:
+                    decoded = json_body  # Use just the JSON body
+                    logger.debug(f"Extracted JSON-RPC from HTTP: {decoded[:100]}...")
+            
+            # Process if we have JSON-RPC content
             if decoded.startswith("{") and "jsonrpc" in decoded:
                 logger.debug(f"Sniffer captured: {decoded}")
 
@@ -180,6 +198,10 @@ def packet_callback(pkt):
                     "message": decoded,
                     "traffic_type": "TCP/Direct",
                 }
+                
+                # Add metadata if this is MCPHawk's own MCP traffic
+                if src_port in _mcphawk_mcp_ports or dst_port in _mcphawk_mcp_ports:
+                    entry["metadata"] = '{"source": "mcphawk-mcp"}'
 
                 log_message(entry)
 
@@ -191,7 +213,7 @@ def packet_callback(pkt):
             logger.debug(f"JSON decode failed: {e}")
 
 
-def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = False, debug: bool = False, excluded_ports: list[int] | None = None) -> None:
+def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = False, debug: bool = False, excluded_ports: list[int] | None = None, mcphawk_mcp_ports: list[int] | None = None) -> None:
     """
     Start sniffing packets on the appropriate interface.
     - On macOS: use `lo0`
@@ -201,10 +223,12 @@ def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = F
         filter_expr: BPF filter expression
         auto_detect: If True, automatically detect MCP traffic on any port
         debug: If True, enable debug logging
+        mcphawk_mcp_ports: List of ports where MCPHawk's own MCP server is running
     """
-    global _auto_detect_mode, _excluded_ports
+    global _auto_detect_mode, _excluded_ports, _mcphawk_mcp_ports
     _auto_detect_mode = auto_detect
     _excluded_ports = set(excluded_ports) if excluded_ports else set()
+    _mcphawk_mcp_ports = set(mcphawk_mcp_ports) if mcphawk_mcp_ports else set()
 
     # Configure logging based on debug flag
     if debug:
