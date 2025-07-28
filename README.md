@@ -17,7 +17,7 @@ MCPHawk is a passive sniffer for **Model Context Protocol (MCP)** traffic, simil
 - MCPHawk can reconstruct full JSON-RPC messages from raw TCP traffic without requiring a handshake. 
 - It captures traffic "on the wire" between any MCP client and server—does not require client/server modification.
 
-<img src="examples/branding/mcphawk_screenshot.png" alt="MCPHawk Logo" width="100%">
+<img src="examples/branding/mcphawk_screenshot.png" alt="MCPHawk Screenshot" width="100%">
 
 ## Features
 
@@ -166,6 +166,8 @@ MCPHawk includes an MCP server that allows you to query captured traffic using t
 - Integrating traffic analysis into your MCP-enabled tools
 - Programmatically searching and filtering captured data
 
+<img src="examples/branding/mcphawk_claudedesktop.png" alt="MCPHawk Claude Desktop MCP" width="100%">
+
 ### Available MCP Tools
 
 - **query_traffic** - Fetch logs with pagination (limit/offset)
@@ -251,6 +253,7 @@ sudo mcphawk web --auto-detect
 Vote for features by opening a GitHub issue!
 
 - [x] **Auto-detect MCP traffic** - Automatically discover MCP traffic on any port without prior configuration
+- [x] **MCP Server Interface** - Expose captured traffic via MCP server for AI agents to query and analyze traffic patterns
 - [ ] **Protocol Version Detection** - Identify and display MCP protocol version from captured traffic
 - [ ] **Smart Search & Filtering** - Search by method name, params, or any JSON field with regex support
 - [ ] **Performance Analytics** - Request/response timing, method frequency charts, and latency distribution
@@ -261,7 +264,6 @@ Vote for features by opening a GitHub issue!
 - [ ] **Interactive Replay** - Click any request to re-send it, edit and replay captured messages
 - [ ] **Real-time Alerts** - Alert on specific methods or error patterns with webhook support
 - [ ] **Visualization** - Sequence diagrams, resource heat maps, method dependency graphs
-- [x] **MCP Server Interface** - Expose captured traffic via MCP server for AI agents to query and analyze traffic patterns
 
 ... and a few more off the deep end:
 - [ ] **TLS/HTTPS Support (MITM Proxy Mode)** - Optional man-in-the-middle proxy with certificate installation for encrypted traffic
