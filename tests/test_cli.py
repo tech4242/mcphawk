@@ -46,7 +46,7 @@ def test_sniff_command_requires_flags():
     """Test sniff command requires port, filter, or auto-detect."""
     result = runner.invoke(app, ["sniff"])
     assert result.exit_code == 1
-    assert "[ERROR] You must specify either --port, --filter, or --auto-detect" in result.stdout
+    assert "You must specify either --port, --filter, or --auto-detect" in result.stdout
     assert "mcphawk sniff --port 3000" in result.stdout
     assert "mcphawk sniff --filter 'tcp port 3000 or tcp port 3001'" in result.stdout
     assert "mcphawk sniff --auto-detect" in result.stdout
@@ -72,8 +72,9 @@ def test_mcp_command_stdio_transport():
         result = runner.invoke(app, ["mcp", "--transport", "stdio"])
 
         # Check output
-        assert "[MCPHawk] Starting MCP server (transport: stdio)" in result.stdout
-        assert "mcpServers" in result.stdout
+        assert "Starting MCP server (transport: stdio)" in result.stdout
+        # The debug output with mcpServers only shows up with debug flag
+        # So we don't check for it here
 
         # Verify server was created and run_stdio was called
         mock_server_class.assert_called_once()
@@ -95,9 +96,9 @@ def test_mcp_command_http_transport():
         result = runner.invoke(app, ["mcp", "--transport", "http", "--mcp-port", "8765"])
 
         # Check output
-        assert "[MCPHawk] Starting MCP server (transport: http)" in result.stdout
+        assert "Starting MCP server (transport: http)" in result.stdout
         assert "http://localhost:8765/mcp" in result.stdout
-        assert "curl -X POST" in result.stdout
+        # curl example only shows in debug mode
 
         # Verify server was created and run_http was called
         mock_server_class.assert_called_once()
@@ -113,7 +114,7 @@ def test_mcp_command_unknown_transport():
     """Test mcp command with unknown transport."""
     result = runner.invoke(app, ["mcp", "--transport", "websocket"])
     assert result.exit_code == 1
-    assert "[ERROR] Unknown transport: websocket" in result.stdout
+    assert "Unknown transport: websocket" in result.stdout
 
 
 def test_sniff_with_mcp_http():
@@ -200,7 +201,7 @@ def test_mcp_command_custom_port():
         result = runner.invoke(app, ["mcp", "--transport", "http", "--mcp-port", "9999"])
 
         # Check output shows custom port
-        assert "[MCPHawk] Starting MCP server (transport: http)" in result.stdout
+        assert "Starting MCP server (transport: http)" in result.stdout
         assert "http://localhost:9999/mcp" in result.stdout
 
         # Verify server was created
@@ -252,9 +253,9 @@ def test_mcp_stdio_ignores_port():
         result = runner.invoke(app, ["mcp", "--transport", "stdio", "--mcp-port", "9999"])
 
         # Check output doesn't mention the port
-        assert "[MCPHawk] Starting MCP server (transport: stdio)" in result.stdout
+        assert "Starting MCP server (transport: stdio)" in result.stdout
         assert "9999" not in result.stdout
-        assert "mcpServers" in result.stdout
+        # mcpServers only shows in debug output
 
         # Verify run_stdio was called (not run_http)
         assert mock_server_instance.run_stdio.called
@@ -337,7 +338,7 @@ def test_web_command_requires_flags():
     """Test web command requires port, filter, auto-detect, or no-sniffer."""
     result = runner.invoke(app, ["web"])
     assert result.exit_code == 1
-    assert "[ERROR] You must specify either --port, --filter, or --auto-detect (or use --no-sniffer)" in result.stdout
+    assert "You must specify either --port, --filter, or --auto-detect (or use --no-sniffer)" in result.stdout
     assert "mcphawk web --port 3000" in result.stdout
     assert "mcphawk web --filter 'tcp port 3000 or tcp port 3001'" in result.stdout
     assert "mcphawk web --auto-detect" in result.stdout

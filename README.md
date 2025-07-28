@@ -146,11 +146,11 @@ sudo mcphawk web --port 3000 --host 0.0.0.0 --web-port 9000
 sudo mcphawk sniff --port 3000 --debug
 sudo mcphawk web --port 3000 --debug
 
-# Start MCP server with captured data (stdio transport)
-mcphawk mcp
-
-# Start MCP server with Streamable HTTP transport
+# Start MCP server with Streamable HTTP transport (default)
 mcphawk mcp --transport http --mcp-port 8765
+
+# Start MCP server with stdio transport (for Claude Desktop integration)
+mcphawk mcp --transport stdio
 
 # Start sniffer with integrated MCP server (HTTP transport)
 sudo mcphawk sniff --port 3000 --with-mcp --mcp-transport http
@@ -204,11 +204,13 @@ Configure in Claude Desktop settings:
   "mcpServers": {
     "mcphawk": {
       "command": "mcphawk",
-      "args": ["mcp"]
+      "args": ["mcp", "--transport", "stdio"]
     }
   }
 }
 ```
+
+See [examples/stdio_client.py](examples/stdio_client.py) for a complete working example of stdio communication.
 
 ## Platform Support
 

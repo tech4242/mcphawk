@@ -13,6 +13,9 @@ from mcphawk.web.server import run_web
 # Suppress Scapy warnings about network interfaces
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
+# Setup logger for CLI
+logger = logging.getLogger("mcphawk.cli")
+
 # ✅ Typer multi-command app
 app = typer.Typer(help="MCPHawk: Passive MCP traffic sniffer + dashboard")
 
@@ -31,13 +34,20 @@ def sniff(
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug output")
 ):
     """Start sniffing MCP traffic (console output only)."""
+    # Configure logging - clear existing handlers first
+    logger.handlers.clear()
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+
     # Validate that user specified either port, filter, or auto-detect
     if not any([port, filter, auto_detect]):
-        print("[ERROR] You must specify either --port, --filter, or --auto-detect")
-        print("Examples:")
-        print("  mcphawk sniff --port 3000")
-        print("  mcphawk sniff --filter 'tcp port 3000 or tcp port 3001'")
-        print("  mcphawk sniff --auto-detect")
+        logger.error("You must specify either --port, --filter, or --auto-detect")
+        logger.error("Examples:")
+        logger.error("  mcphawk sniff --port 3000")
+        logger.error("  mcphawk sniff --filter 'tcp port 3000 or tcp port 3001'")
+        logger.error("  mcphawk sniff --auto-detect")
         raise typer.Exit(1)
 
     if filter:
@@ -49,7 +59,7 @@ def sniff(
     else:
         # Auto-detect mode - capture all TCP traffic
         filter_expr = "tcp"
-        print("[MCPHawk] Auto-detect mode: monitoring all TCP traffic for MCP messages")
+        logger.info("Auto-detect mode: monitoring all TCP traffic for MCP messages")
 
     # Start MCP server if requested
     mcp_thread = None
@@ -58,20 +68,20 @@ def sniff(
         server = MCPHawkServer()
 
         if mcp_transport == "http":
-            print(f"[MCPHawk] Starting MCP HTTP server on http://localhost:{mcp_port}/mcp")
+            logger.info(f"Starting MCP HTTP server on http://localhost:{mcp_port}/mcp")
             excluded_ports = [mcp_port]  # Exclude MCP port from sniffing
             def run_mcp():
                 asyncio.run(server.run_http(port=mcp_port))
         else:
-            print("[MCPHawk] Starting MCP server on stdio (configure in your MCP client)")
+            logger.info("Starting MCP server on stdio (configure in your MCP client)")
             def run_mcp():
                 asyncio.run(server.run_stdio())
 
         mcp_thread = threading.Thread(target=run_mcp, daemon=True)
         mcp_thread.start()
 
-    print(f"[MCPHawk] Starting sniffer with filter: {filter_expr}")
-    print("[MCPHawk] Press Ctrl+C to stop...")
+    logger.info(f"Starting sniffer with filter: {filter_expr}")
+    logger.info("Press Ctrl+C to stop...")
 
     try:
         start_sniffer(
@@ -81,7 +91,7 @@ def sniff(
             excluded_ports=excluded_ports
         )
     except KeyboardInterrupt:
-        print("\n[MCPHawk] Sniffer stopped.")
+        logger.info("Sniffer stopped.")
         sys.exit(0)
 
 
@@ -99,14 +109,21 @@ def web(
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug output")
 ):
     """Start the MCPHawk dashboard with sniffer."""
+    # Configure logging - clear existing handlers first
+    logger.handlers.clear()
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+
     # If sniffer is enabled, validate that user specified either port, filter, or auto-detect
     if not no_sniffer and not any([port, filter, auto_detect]):
-        print("[ERROR] You must specify either --port, --filter, or --auto-detect (or use --no-sniffer)")
-        print("Examples:")
-        print("  mcphawk web --port 3000")
-        print("  mcphawk web --filter 'tcp port 3000 or tcp port 3001'")
-        print("  mcphawk web --auto-detect")
-        print("  mcphawk web --no-sniffer  # View historical logs only")
+        logger.error("You must specify either --port, --filter, or --auto-detect (or use --no-sniffer)")
+        logger.error("Examples:")
+        logger.error("  mcphawk web --port 3000")
+        logger.error("  mcphawk web --filter 'tcp port 3000 or tcp port 3001'")
+        logger.error("  mcphawk web --auto-detect")
+        logger.error("  mcphawk web --no-sniffer  # View historical logs only")
         raise typer.Exit(1)
 
     # Prepare filter expression
@@ -126,12 +143,12 @@ def web(
         server = MCPHawkServer()
 
         if mcp_transport == "http":
-            print(f"[MCPHawk] Starting MCP HTTP server on http://localhost:{mcp_port}/mcp")
+            logger.info(f"Starting MCP HTTP server on http://localhost:{mcp_port}/mcp")
             excluded_ports = [mcp_port]  # Exclude MCP port from sniffing
             def run_mcp():
                 asyncio.run(server.run_http(port=mcp_port))
         else:
-            print("[MCPHawk] Starting MCP server on stdio (configure in your MCP client)")
+            logger.info("Starting MCP server on stdio (configure in your MCP client)")
             def run_mcp():
                 asyncio.run(server.run_stdio())
 
@@ -157,12 +174,25 @@ def mcp(
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug output")
 ):
     """Run MCPHawk MCP server standalone (query existing captured data)."""
-    print(f"[MCPHawk] Starting MCP server (transport: {transport})")
+    # Configure logging based on transport and debug flag - clear existing handlers first
+    logger.handlers.clear()
+    if transport == "stdio":
+        # For stdio, all logs must go to stderr to avoid interfering with JSON-RPC on stdout
+        handler = logging.StreamHandler(sys.stderr)
+    else:
+        # For other transports, use stdout
+        handler = logging.StreamHandler(sys.stdout)
+
+    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+
+    logger.info(f"Starting MCP server (transport: {transport})")
 
     if transport == "stdio":
-        print("[MCPHawk] Use this server with MCP clients by configuring stdio transport")
-        print("[MCPHawk] Example MCP client configuration:")
-        print("""
+        logger.debug("Use this server with MCP clients by configuring stdio transport")
+        logger.debug("Example MCP client configuration:")
+        logger.debug("""
 {
   "mcpServers": {
     "mcphawk": {
@@ -173,11 +203,11 @@ def mcp(
 }
         """)
     elif transport == "http":
-        print(f"[MCPHawk] MCP server will listen on http://localhost:{mcp_port}/mcp")
-        print("[MCPHawk] Example test command:")
-        print(f"curl -X POST http://localhost:{mcp_port}/mcp -H 'Content-Type: application/json' -d '{{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":{{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{{}},\"clientInfo\":{{\"name\":\"test\",\"version\":\"1.0\"}}}},\"id\":1}}'")
+        logger.info(f"MCP server will listen on http://localhost:{mcp_port}/mcp")
+        logger.debug("Example test command:")
+        logger.debug(f"curl -X POST http://localhost:{mcp_port}/mcp -H 'Content-Type: application/json' -d '{{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":{{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{{}},\"clientInfo\":{{\"name\":\"test\",\"version\":\"1.0\"}}}},\"id\":1}}'")
     else:
-        print(f"[ERROR] Unknown transport: {transport}")
+        logger.error(f"Unknown transport: {transport}")
         raise typer.Exit(1)
 
     # Create and run MCP server
@@ -189,5 +219,9 @@ def mcp(
         elif transport == "http":
             asyncio.run(server.run_http(port=mcp_port))
     except KeyboardInterrupt:
-        print("\n[MCPHawk] MCP server stopped.")
+        logger.info("MCP server stopped.")
         sys.exit(0)
+
+
+if __name__ == "__main__":
+    app()
