@@ -137,7 +137,8 @@ def web(
         filter_expr=filter_expr,
         auto_detect=auto_detect,
         debug=debug,
-        excluded_ports=[mcp_port] if with_mcp else []
+        excluded_ports=[mcp_port] if with_mcp else [],
+        with_mcp=with_mcp
     )
 
 

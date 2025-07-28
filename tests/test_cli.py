@@ -102,7 +102,7 @@ def test_web_command_with_port(mock_run_web):
     """Test web command with port option."""
     result = runner.invoke(app, ["web", "--port", "3000"])
     assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp port 3000", auto_detect=False, debug=False, excluded_ports=[])
+    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp port 3000", auto_detect=False, debug=False, excluded_ports=[], with_mcp=False)
 
 
 @patch('mcphawk.cli.run_web')
@@ -110,7 +110,7 @@ def test_web_command_no_sniffer(mock_run_web):
     """Test web command with --no-sniffer."""
     result = runner.invoke(app, ["web", "--no-sniffer"])
     assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=False, host="127.0.0.1", port=8000, filter_expr=None, auto_detect=False, debug=False, excluded_ports=[])
+    mock_run_web.assert_called_once_with(sniffer=False, host="127.0.0.1", port=8000, filter_expr=None, auto_detect=False, debug=False, excluded_ports=[], with_mcp=False)
 
 
 @patch('mcphawk.cli.run_web')
@@ -118,7 +118,7 @@ def test_web_command_custom_host_web_port(mock_run_web):
     """Test web command with custom host and web-port."""
     result = runner.invoke(app, ["web", "--port", "3000", "--host", "0.0.0.0", "--web-port", "9000"])
     assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=True, host="0.0.0.0", port=9000, filter_expr="tcp port 3000", auto_detect=False, debug=False, excluded_ports=[])
+    mock_run_web.assert_called_once_with(sniffer=True, host="0.0.0.0", port=9000, filter_expr="tcp port 3000", auto_detect=False, debug=False, excluded_ports=[], with_mcp=False)
 
 
 @patch('mcphawk.cli.run_web')
@@ -126,7 +126,7 @@ def test_web_command_with_filter(mock_run_web):
     """Test web command with custom filter."""
     result = runner.invoke(app, ["web", "--filter", "tcp port 8080 or tcp port 8081"])
     assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp port 8080 or tcp port 8081", auto_detect=False, debug=False, excluded_ports=[])
+    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp port 8080 or tcp port 8081", auto_detect=False, debug=False, excluded_ports=[], with_mcp=False)
 
 
 @patch('mcphawk.cli.run_web')
@@ -134,7 +134,7 @@ def test_web_command_auto_detect(mock_run_web):
     """Test web command with auto-detect mode."""
     result = runner.invoke(app, ["web", "--auto-detect"])
     assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp", auto_detect=True, debug=False, excluded_ports=[])
+    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp", auto_detect=True, debug=False, excluded_ports=[], with_mcp=False)
 
 
 def test_scapy_warnings_suppressed():
@@ -170,7 +170,7 @@ def test_web_command_with_debug_flag(mock_run_web):
     """Test web command with debug flag."""
     result = runner.invoke(app, ["web", "--port", "3000", "--debug"])
     assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp port 3000", auto_detect=False, debug=True, excluded_ports=[])
+    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp port 3000", auto_detect=False, debug=True, excluded_ports=[], with_mcp=False)
 
 
 @patch('mcphawk.cli.run_web')
@@ -196,7 +196,8 @@ def test_web_command_with_mcp(mock_thread, mock_mcp_server, mock_run_web):
         filter_expr="tcp port 3000",
         auto_detect=False,
         debug=False,
-        excluded_ports=[8765]  # Default MCP port
+        excluded_ports=[8765],  # Default MCP port
+        with_mcp=True
     )
 
 

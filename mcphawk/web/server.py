@@ -15,6 +15,9 @@ from mcphawk.web.broadcaster import active_clients
 # Set up logger for this module
 logger = logging.getLogger(__name__)
 
+# Global flag to track if web server was started with MCP
+_with_mcp = False
+
 app = FastAPI()
 
 # Allow local UI dev or CDN-based dashboard
@@ -25,6 +28,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/status")
+def get_status():
+    """
+    Get server status including MCP server status.
+    """
+    return JSONResponse(content={
+        "with_mcp": _with_mcp
+    })
 
 
 @app.get("/logs")
@@ -103,7 +116,7 @@ def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False, debug: bo
     thread.start()
 
 
-def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: Optional[str] = None, auto_detect: bool = False, debug: bool = False, excluded_ports: Optional[list[int]] = None):
+def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: Optional[str] = None, auto_detect: bool = False, debug: bool = False, excluded_ports: Optional[list[int]] = None, with_mcp: bool = False):
     """
     Run the web server and optionally the sniffer.
 
@@ -115,6 +128,10 @@ def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, fil
         auto_detect: Whether to auto-detect MCP traffic.
         debug: Whether to enable debug logging.
     """
+    # Set global MCP flag
+    global _with_mcp
+    _with_mcp = with_mcp
+
     if sniffer:
         if not filter_expr:
             raise ValueError("filter_expr is required when sniffer is enabled")
