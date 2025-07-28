@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import platform
+import uuid
 from datetime import datetime, timezone
 
 # Suppress Scapy warnings before importing
@@ -34,6 +35,9 @@ def _broadcast_in_any_loop(log_entry: dict) -> None:
 # Global variable to track auto-detect mode
 _auto_detect_mode = False
 
+# Global variable to track excluded ports
+_excluded_ports = set()
+
 # Track established WebSocket connections
 _ws_connections = set()
 
@@ -42,6 +46,12 @@ def packet_callback(pkt):
     Callback for every sniffed packet.
     Extract JSON-RPC messages from raw TCP payloads.
     """
+    # Skip packets to/from excluded ports
+    if pkt.haslayer(TCP) and _excluded_ports:
+        tcp_layer = pkt[TCP]
+        if tcp_layer.sport in _excluded_ports or tcp_layer.dport in _excluded_ports:
+            return
+
     if pkt.haslayer(Raw):
         raw_payload = pkt[Raw].load
         if not _auto_detect_mode:  # Less verbose in auto-detect mode
@@ -109,7 +119,9 @@ def packet_callback(pkt):
                     if _auto_detect_mode and "jsonrpc" in msg:
                         print(f"[MCPHawk] Detected WebSocket MCP traffic on port {src_port} -> {dst_port}")
 
+                    log_id = str(uuid.uuid4())
                     entry = {
+                        "log_id": log_id,
                         "timestamp": ts,
                         "src_ip": src_ip,
                         "src_port": src_port,
@@ -156,7 +168,9 @@ def packet_callback(pkt):
                     src_ip = ""
                     dst_ip = ""
 
+                log_id = str(uuid.uuid4())
                 entry = {
+                    "log_id": log_id,
                     "timestamp": ts,
                     "src_ip": src_ip,
                     "src_port": src_port,
@@ -177,7 +191,7 @@ def packet_callback(pkt):
             logger.debug(f"JSON decode failed: {e}")
 
 
-def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = False, debug: bool = False) -> None:
+def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = False, debug: bool = False, excluded_ports: list[int] | None = None) -> None:
     """
     Start sniffing packets on the appropriate interface.
     - On macOS: use `lo0`
@@ -188,8 +202,9 @@ def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = F
         auto_detect: If True, automatically detect MCP traffic on any port
         debug: If True, enable debug logging
     """
-    global _auto_detect_mode
+    global _auto_detect_mode, _excluded_ports
     _auto_detect_mode = auto_detect
+    _excluded_ports = set(excluded_ports) if excluded_ports else set()
 
     # Configure logging based on debug flag
     if debug:

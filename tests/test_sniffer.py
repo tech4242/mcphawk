@@ -85,7 +85,7 @@ def test_packet_callback(clean_db, dummy_server):
 
     conn = sqlite3.connect(TEST_DB)
     cur = conn.cursor()
-    cur.execute("SELECT message FROM logs ORDER BY id DESC LIMIT 1;")
+    cur.execute("SELECT message FROM logs ORDER BY log_id DESC LIMIT 1;")
     logged_msg = cur.fetchone()[0]
     conn.close()
 

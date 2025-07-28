@@ -29,7 +29,7 @@ def init_db() -> None:
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            log_id TEXT PRIMARY KEY,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             src_ip TEXT,
             dst_ip TEXT,
@@ -57,6 +57,7 @@ def log_message(entry: dict[str, Any]) -> None:
 
     Args:
         entry (Dict[str, Any]): Must contain MCPMessageLog fields:
+            log_id (str) - UUID for the log entry
             timestamp (datetime) - If missing, current time is used
             src_ip (str)
             dst_ip (str)
@@ -67,14 +68,19 @@ def log_message(entry: dict[str, Any]) -> None:
             traffic_type (str): 'TCP', 'WS', or 'N/A' (optional, defaults to 'N/A')
     """
     timestamp = entry.get("timestamp", datetime.now(tz=timezone.utc))
+    log_id = entry.get("log_id")
+    if not log_id:
+        raise ValueError("log_id is required")
+
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO logs (timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
+            log_id,
             timestamp.isoformat(),
             entry.get("src_ip"),
             entry.get("dst_ip"),
@@ -113,9 +119,9 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type
         FROM logs
-        ORDER BY id DESC
+        ORDER BY timestamp DESC
         LIMIT ?
         """,
         (limit,),
@@ -125,6 +131,7 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
 
     return [
         {
+            "log_id": row["log_id"],
             "timestamp": datetime.fromisoformat(row["timestamp"]),
             "src_ip": row["src_ip"],
             "dst_ip": row["dst_ip"],
@@ -162,3 +169,47 @@ def clear_logs() -> None:
     cur.execute("DELETE FROM logs;")
     conn.commit()
     conn.close()
+
+
+def get_log_by_id(log_id: str) -> dict[str, Any] | None:
+    """
+    Fetch a specific log entry by ID.
+
+    Args:
+        log_id (str): The UUID of the log entry to retrieve.
+
+    Returns:
+        Dictionary matching MCPMessageLog format or None if not found.
+    """
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    if not current_path.exists():
+        return None
+
+    conn = sqlite3.connect(current_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type
+        FROM logs
+        WHERE log_id = ?
+        """,
+        (log_id,),
+    )
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    return {
+        "log_id": row["log_id"],
+        "timestamp": datetime.fromisoformat(row["timestamp"]),
+        "src_ip": row["src_ip"],
+        "dst_ip": row["dst_ip"],
+        "src_port": row["src_port"],
+        "dst_port": row["dst_port"],
+        "direction": row["direction"],
+        "message": row["message"],
+        "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
+    }

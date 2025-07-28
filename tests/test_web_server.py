@@ -132,7 +132,7 @@ def test_run_web_with_sniffer():
         )
 
         # Verify sniffer was started
-        mock_start_sniffer.assert_called_once_with("tcp port 3000", False, True)
+        mock_start_sniffer.assert_called_once_with("tcp port 3000", False, True, None)
 
         # Verify uvicorn was started with correct params
         mock_uvicorn.assert_called_once()

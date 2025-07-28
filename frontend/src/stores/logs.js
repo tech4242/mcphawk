@@ -58,7 +58,7 @@ export const useLogStore = defineStore('logs', () => {
   })
 
   const selectedLog = computed(() => {
-    return logs.value.find(log => log.id === selectedLogId.value)
+    return logs.value.find(log => log.log_id === selectedLogId.value)
   })
 
   const pairedLogs = computed(() => {
@@ -71,7 +71,7 @@ export const useLogStore = defineStore('logs', () => {
     logs.value.forEach(log => {
       const logParsed = parseMessage(log.message)
       if (logParsed && logParsed.id === parsed.id) {
-        paired.add(log.id)
+        paired.add(log.log_id)
       }
     })
     

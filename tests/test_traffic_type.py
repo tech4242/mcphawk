@@ -1,5 +1,6 @@
 """Test traffic_type field is properly set for TCP and WebSocket traffic."""
 import json
+import uuid
 from datetime import datetime, timezone
 
 import pytest
@@ -20,6 +21,7 @@ def test_db(tmp_path):
 def test_tcp_traffic_type(test_db):
     """Test that TCP traffic is marked with traffic_type='TCP'."""
     entry = {
+        "log_id": str(uuid.uuid4()),
         "timestamp": datetime.now(tz=timezone.utc),
         "src_ip": "127.0.0.1",
         "src_port": 12345,
@@ -40,6 +42,7 @@ def test_tcp_traffic_type(test_db):
 def test_websocket_traffic_type(test_db):
     """Test that WebSocket traffic is marked with traffic_type='WS'."""
     entry = {
+        "log_id": str(uuid.uuid4()),
         "timestamp": datetime.now(tz=timezone.utc),
         "src_ip": "127.0.0.1",
         "src_port": 8765,
@@ -60,6 +63,7 @@ def test_websocket_traffic_type(test_db):
 def test_unknown_traffic_type(test_db):
     """Test that unknown traffic is marked with traffic_type='N/A'."""
     entry = {
+        "log_id": str(uuid.uuid4()),
         "timestamp": datetime.now(tz=timezone.utc),
         "src_ip": "127.0.0.1",
         "src_port": 9999,
@@ -87,10 +91,11 @@ def test_legacy_entries_without_traffic_type(test_db):
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO logs (timestamp, src_ip, dst_ip, src_port, dst_port, direction, message)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
+            str(uuid.uuid4()),
             datetime.now(tz=timezone.utc).isoformat(),
             "127.0.0.1",
             "127.0.0.1",
