@@ -26,7 +26,8 @@ def sniff(
     filter: str = typer.Option(None, "--filter", "-f", help="Custom BPF filter expression"),
     auto_detect: bool = typer.Option(False, "--auto-detect", "-a", help="Auto-detect MCP traffic on any port"),
     with_mcp: bool = typer.Option(False, "--with-mcp", help="Start MCP server alongside sniffer"),
-    mcp_port: int = typer.Option(8765, "--mcp-port", help="Port for MCP server (stdio if not specified)"),
+    mcp_transport: str = typer.Option("http", "--mcp-transport", help="MCP transport type: stdio or http"),
+    mcp_port: int = typer.Option(8765, "--mcp-port", help="Port for MCP HTTP server (ignored for stdio)"),
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug output")
 ):
     """Start sniffing MCP traffic (console output only)."""
@@ -52,24 +53,27 @@ def sniff(
 
     # Start MCP server if requested
     mcp_thread = None
+    excluded_ports = []
     if with_mcp:
-        print("[MCPHawk] Starting MCP server on stdio (configure in your MCP client)")
         server = MCPHawkServer()
 
-        def run_mcp():
-            asyncio.run(server.run_stdio())
+        if mcp_transport == "http":
+            print(f"[MCPHawk] Starting MCP HTTP server on http://localhost:{mcp_port}/mcp")
+            excluded_ports = [mcp_port]  # Exclude MCP port from sniffing
+            def run_mcp():
+                asyncio.run(server.run_http(port=mcp_port))
+        else:
+            print("[MCPHawk] Starting MCP server on stdio (configure in your MCP client)")
+            def run_mcp():
+                asyncio.run(server.run_stdio())
 
         mcp_thread = threading.Thread(target=run_mcp, daemon=True)
         mcp_thread.start()
 
     print(f"[MCPHawk] Starting sniffer with filter: {filter_expr}")
-    if with_mcp and filter_expr != "tcp":
-        print(f"[MCPHawk] Note: MCP server traffic on port {mcp_port} will be excluded from capture")
     print("[MCPHawk] Press Ctrl+C to stop...")
 
     try:
-        # Exclude MCP port if running MCP server
-        excluded_ports = [mcp_port] if with_mcp else []
         start_sniffer(
             filter_expr=filter_expr,
             auto_detect=auto_detect,
@@ -90,7 +94,8 @@ def web(
     host: str = typer.Option("127.0.0.1", "--host", help="Web server host"),
     web_port: int = typer.Option(8000, "--web-port", help="Web server port"),
     with_mcp: bool = typer.Option(False, "--with-mcp", help="Start MCP server alongside web UI"),
-    mcp_port: int = typer.Option(8765, "--mcp-port", help="Port for MCP server (stdio if not specified)"),
+    mcp_transport: str = typer.Option("http", "--mcp-transport", help="MCP transport type: stdio or http"),
+    mcp_port: int = typer.Option(8765, "--mcp-port", help="Port for MCP HTTP server (ignored for stdio)"),
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug output")
 ):
     """Start the MCPHawk dashboard with sniffer."""
@@ -116,19 +121,22 @@ def web(
 
     # Start MCP server if requested
     mcp_thread = None
+    excluded_ports = []
     if with_mcp:
-        print("[MCPHawk] Starting MCP server on stdio (configure in your MCP client)")
         server = MCPHawkServer()
 
-        def run_mcp():
-            asyncio.run(server.run_stdio())
+        if mcp_transport == "http":
+            print(f"[MCPHawk] Starting MCP HTTP server on http://localhost:{mcp_port}/mcp")
+            excluded_ports = [mcp_port]  # Exclude MCP port from sniffing
+            def run_mcp():
+                asyncio.run(server.run_http(port=mcp_port))
+        else:
+            print("[MCPHawk] Starting MCP server on stdio (configure in your MCP client)")
+            def run_mcp():
+                asyncio.run(server.run_stdio())
 
         mcp_thread = threading.Thread(target=run_mcp, daemon=True)
         mcp_thread.start()
-
-    # Update filter to exclude MCP port if needed
-    if with_mcp and filter_expr and filter_expr != "tcp":
-        print(f"[MCPHawk] Note: MCP server traffic on port {mcp_port} will be excluded from capture")
 
     run_web(
         sniffer=not no_sniffer,
@@ -137,7 +145,7 @@ def web(
         filter_expr=filter_expr,
         auto_detect=auto_detect,
         debug=debug,
-        excluded_ports=[mcp_port] if with_mcp else [],
+        excluded_ports=excluded_ports,
         with_mcp=with_mcp
     )
 
@@ -164,10 +172,10 @@ def mcp(
   }
 }
         """)
-    elif transport == "tcp":
-        print(f"[MCPHawk] MCP server will listen on port {mcp_port}")
-        print("[MCPHawk] Note: TCP transport not yet implemented")
-        raise typer.Exit(1)
+    elif transport == "http":
+        print(f"[MCPHawk] MCP server will listen on http://localhost:{mcp_port}/mcp")
+        print("[MCPHawk] Example test command:")
+        print(f"curl -X POST http://localhost:{mcp_port}/mcp -H 'Content-Type: application/json' -d '{{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":{{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{{}},\"clientInfo\":{{\"name\":\"test\",\"version\":\"1.0\"}}}},\"id\":1}}'")
     else:
         print(f"[ERROR] Unknown transport: {transport}")
         raise typer.Exit(1)
@@ -176,7 +184,10 @@ def mcp(
     server = MCPHawkServer()
 
     try:
-        asyncio.run(server.run_stdio())
+        if transport == "stdio":
+            asyncio.run(server.run_stdio())
+        elif transport == "http":
+            asyncio.run(server.run_http(port=mcp_port))
     except KeyboardInterrupt:
         print("\n[MCPHawk] MCP server stopped.")
         sys.exit(0)

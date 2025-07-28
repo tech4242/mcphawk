@@ -43,6 +43,10 @@ Non-exhaustive list:
   - expand mode to directly see JSON withtout detailed view
   - filtering 
   - always see if WS connection is up for live updates
+- **MCP Server for querying captured data** - Query captured traffic via MCP protocol
+  - Standalone mode or integrated with sniffer/web commands
+  - Streamable HTTP transport for easy integration and testing
+  - Tools for traffic search, statistics, and analysis
 
 ## Comparison with Similar Tools
 
@@ -141,6 +145,69 @@ sudo mcphawk web --port 3000 --host 0.0.0.0 --web-port 9000
 # Enable debug output for troubleshooting
 sudo mcphawk sniff --port 3000 --debug
 sudo mcphawk web --port 3000 --debug
+
+# Start MCP server with captured data (stdio transport)
+mcphawk mcp
+
+# Start MCP server with Streamable HTTP transport
+mcphawk mcp --transport http --mcp-port 8765
+
+# Start sniffer with integrated MCP server (HTTP transport)
+sudo mcphawk sniff --port 3000 --with-mcp --mcp-transport http
+
+# Start web UI with integrated MCP server
+sudo mcphawk web --port 3000 --with-mcp --mcp-transport http --mcp-port 8765
+```
+
+## MCP Server for Querying Captured Data
+
+MCPHawk includes an MCP server that allows you to query captured traffic using the Model Context Protocol. This is perfect for:
+- Building AI agents that analyze captured traffic
+- Integrating traffic analysis into your MCP-enabled tools
+- Programmatically searching and filtering captured data
+
+### Available MCP Tools
+
+- **query_traffic** - Fetch logs with pagination (limit/offset)
+- **get_log** - Retrieve specific log entry by ID
+- **search_traffic** - Search by content, message type, or traffic type
+- **get_stats** - Get traffic statistics (requests, responses, errors, etc.)
+- **list_methods** - List all unique JSON-RPC methods seen
+
+### Using with Streamable HTTP Transport
+
+The HTTP transport makes it easy to test and integrate:
+
+```bash
+# Start MCP server on HTTP
+mcphawk mcp --transport http --mcp-port 8765
+
+# Initialize session
+curl -X POST http://localhost:8765/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'X-Session-Id: my-session' \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0"}},"id":1}'
+
+# Query traffic statistics
+curl -X POST http://localhost:8765/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'X-Session-Id: my-session' \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_stats","arguments":{}},"id":2}'
+```
+
+### Using with stdio Transport (Claude Desktop)
+
+Configure in Claude Desktop settings:
+
+```json
+{
+  "mcpServers": {
+    "mcphawk": {
+      "command": "mcphawk",
+      "args": ["mcp"]
+    }
+  }
+}
 ```
 
 ## Platform Support
@@ -192,7 +259,7 @@ Vote for features by opening a GitHub issue!
 - [ ] **Interactive Replay** - Click any request to re-send it, edit and replay captured messages
 - [ ] **Real-time Alerts** - Alert on specific methods or error patterns with webhook support
 - [ ] **Visualization** - Sequence diagrams, resource heat maps, method dependency graphs
-- [ ] **MCP Server Interface** - Expose captured traffic via MCP server for AI agents to query and analyze traffic patterns
+- [x] **MCP Server Interface** - Expose captured traffic via MCP server for AI agents to query and analyze traffic patterns
 
 ... and a few more off the deep end:
 - [ ] **TLS/HTTPS Support (MITM Proxy Mode)** - Optional man-in-the-middle proxy with certificate installation for encrypted traffic

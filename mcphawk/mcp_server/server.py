@@ -1,6 +1,5 @@
 """MCP server implementation for MCPHawk."""
 
-import asyncio
 import json
 from typing import Any, Optional
 
@@ -22,6 +21,10 @@ class MCPHawkServer:
 
     def _setup_handlers(self):
         """Setup MCP protocol handlers."""
+
+        # Store handlers as instance attributes for HTTP transport
+        self._handle_list_tools = None
+        self._handle_call_tool = None
 
         @self.server.list_tools()
         async def handle_list_tools() -> list[Tool]:
@@ -101,6 +104,9 @@ class MCPHawkServer:
                     }
                 )
             ]
+
+        # Store the handler
+        self._handle_list_tools = handle_list_tools
 
         @self.server.call_tool()
         async def handle_call_tool(name: str, arguments: Optional[dict[str, Any]] = None) -> list[TextContent]:
@@ -215,13 +221,182 @@ class MCPHawkServer:
             else:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
+        # Store the handler
+        self._handle_call_tool = handle_call_tool
+
     async def run_stdio(self):
         """Run the MCP server using stdio transport."""
-        async with self.server.run():
-            # The server will run until interrupted
-            await asyncio.Event().wait()
+        import sys
 
-    async def run_tcp(self, host: str = "127.0.0.1", port: int = 8765):
-        """Run the MCP server using TCP transport."""
-        # TODO: Implement TCP transport when needed
-        raise NotImplementedError("TCP transport not implemented yet")
+        import anyio
+        from mcp.server.stdio import stdio_server
+
+        # Wrap stdin/stdout in async file objects
+        async_stdin = anyio.wrap_file(sys.stdin)
+        async_stdout = anyio.wrap_file(sys.stdout)
+
+        async with stdio_server(async_stdin, async_stdout) as (read_stream, write_stream):
+            await self.server.run(
+                read_stream,
+                write_stream,
+                self.server.create_initialization_options()
+            )
+
+    async def run_http(self, host: str = "127.0.0.1", port: int = 8765):
+        """Run the MCP server using Streamable HTTP transport."""
+        import uuid
+
+        import uvicorn
+        from fastapi import FastAPI, Request
+        from fastapi.responses import JSONResponse
+
+        # Create FastAPI app for HTTP transport
+        app = FastAPI(title="MCPHawk MCP Server")
+
+        # Store active sessions
+        sessions = {}
+
+        # Get handlers for use in closures
+        handle_list_tools = self._handle_list_tools
+        handle_call_tool = self._handle_call_tool
+
+        @app.post("/mcp")
+        async def handle_mcp_request(request: Request):
+            """Handle MCP JSON-RPC requests over HTTP."""
+            try:
+                # Get request body
+                body = await request.json()
+
+                # Get or create session ID from headers
+                session_id = request.headers.get("X-Session-Id", str(uuid.uuid4()))
+
+                # Process the JSON-RPC request
+                method = body.get("method")
+                params = body.get("params", {})
+                request_id = body.get("id")
+
+                # Handle different methods
+                if method == "initialize":
+                    # Mark session as initialized
+                    sessions[session_id] = True
+                    result = {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {
+                            "experimental": {},
+                            "tools": {"listChanged": False}
+                        },
+                        "serverInfo": {
+                            "name": "mcphawk-mcp",
+                            "version": "1.12.2"
+                        }
+                    }
+
+                elif method == "tools/list":
+                    # Check if session is initialized
+                    if session_id not in sessions:
+                        return JSONResponse(
+                            status_code=200,
+                            content={
+                                "jsonrpc": "2.0",
+                                "id": request_id,
+                                "error": {
+                                    "code": -32602,
+                                    "message": "Session not initialized"
+                                }
+                            }
+                        )
+
+                    # Get tools list - call our handler directly
+                    tools = await handle_list_tools()
+                    result = {
+                        "tools": [
+                            {
+                                "name": tool.name,
+                                "description": tool.description,
+                                "inputSchema": tool.inputSchema
+                            }
+                            for tool in tools
+                        ]
+                    }
+
+                elif method == "tools/call":
+                    # Check if session is initialized
+                    if session_id not in sessions:
+                        return JSONResponse(
+                            status_code=200,
+                            content={
+                                "jsonrpc": "2.0",
+                                "id": request_id,
+                                "error": {
+                                    "code": -32602,
+                                    "message": "Session not initialized"
+                                }
+                            }
+                        )
+
+                    # Call the tool
+                    tool_name = params.get("name")
+                    tool_args = params.get("arguments", {})
+
+                    # Call our handler directly
+                    content = await handle_call_tool(tool_name, tool_args)
+
+                    result = {
+                        "content": [
+                            {"type": c.type, "text": c.text}
+                            for c in content
+                        ]
+                    }
+
+                else:
+                    # Unknown method
+                    return JSONResponse(
+                        status_code=200,
+                        content={
+                            "jsonrpc": "2.0",
+                            "id": request_id,
+                            "error": {
+                                "code": -32601,
+                                "message": f"Unknown method: {method}"
+                            }
+                        }
+                    )
+
+                # Return successful response
+                response = {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": result
+                }
+
+                # Include session ID in response headers
+                return JSONResponse(
+                    content=response,
+                    headers={"X-Session-Id": session_id}
+                )
+
+            except Exception as e:
+                import traceback
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "jsonrpc": "2.0",
+                        "id": body.get("id") if "body" in locals() else None,
+                        "error": {
+                            "code": -32603,
+                            "message": "Internal error",
+                            "data": str(e) + "\n" + traceback.format_exc()
+                        }
+                    }
+                )
+
+        # Run the server
+        config = uvicorn.Config(
+            app,
+            host=host,
+            port=port,
+            log_level="info",
+            access_log=False
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
