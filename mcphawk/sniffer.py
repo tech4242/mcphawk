@@ -89,11 +89,10 @@ def packet_callback(pkt):
                     (0xC0 <= first_byte <= 0xCF)     # Masked frames (common case)
                 )
 
-                # Also check for HTTP upgrade
+                # Check specifically for WebSocket HTTP upgrade (not general HTTP)
                 is_http_upgrade = (
-                    raw_payload[:4] == b'HTTP' or
-                    raw_payload[:3] == b'GET' or
-                    b'Upgrade: websocket' in raw_payload
+                    (raw_payload[:3] == b'GET' and b'Upgrade: websocket' in raw_payload) or
+                    (raw_payload[:4] == b'HTTP' and b'Upgrade: websocket' in raw_payload)
                 )
 
             # Check if this is a known WebSocket connection
