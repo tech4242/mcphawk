@@ -47,35 +47,6 @@ def test_sniffer_tcp_traffic_type(test_db):
     assert logs[0]["dst_port"] == 54321
 
 
-def test_sniffer_websocket_traffic_type(test_db):
-    """Test that sniffer marks WebSocket traffic with traffic_type='WS'."""
-    # Create a WebSocket text frame (0x81 = FIN + TEXT)
-    json_rpc = json.dumps({"jsonrpc": "2.0", "method": "test", "id": 1})
-
-    # WebSocket frame: FIN=1, RSV=0, opcode=1 (text), unmasked
-    frame_header = bytes([0x81, len(json_rpc)])  # Text frame, payload length
-    ws_frame = frame_header + json_rpc.encode()
-
-    # Create packet layers
-    ip = IP(src="127.0.0.1", dst="127.0.0.1")
-    tcp = TCP(sport=8765, dport=54321)
-    raw = Raw(load=ws_frame)
-
-    # Construct the packet
-    pkt = ip / tcp / raw
-
-    # Process the packet
-    packet_callback(pkt)
-
-    # Give it a moment to process
-    time.sleep(0.1)
-
-    # Check the logged entry
-    logs = fetch_logs(limit=1)
-    assert len(logs) == 1
-    assert logs[0]["traffic_type"] == "TCP/WS"
-    assert logs[0]["src_port"] == 8765
-    assert logs[0]["dst_port"] == 54321
 
 
 def test_sniffer_non_jsonrpc_ignored(test_db):

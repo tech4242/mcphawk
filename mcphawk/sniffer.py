@@ -10,8 +10,8 @@ logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 from scapy.all import IP, TCP, IPv6, Raw, conf, sniff  # noqa: E402
 
 from mcphawk.logger import log_message  # noqa: E402
+from mcphawk.tcp_reassembly import TCPStreamReassembler  # noqa: E402
 from mcphawk.web.broadcaster import broadcast_new_log  # noqa: E402
-from mcphawk.ws_reassembly import process_ws_packet  # noqa: E402
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -41,8 +41,9 @@ _excluded_ports = set()
 # Global variable to track MCPHawk's own MCP server ports for metadata tagging
 _mcphawk_mcp_ports = set()
 
-# Track established WebSocket connections
-_ws_connections = set()
+# TCP stream reassembler for handling SSE and chunked responses
+_tcp_reassembler = TCPStreamReassembler()
+logger.info("TCP stream reassembler initialized")
 
 def packet_callback(pkt):
     """
@@ -55,113 +56,62 @@ def packet_callback(pkt):
         if tcp_layer.sport in _excluded_ports or tcp_layer.dport in _excluded_ports:
             return
 
+    # Try TCP stream reassembly first for SSE/chunked responses
+    reassembled_messages = _tcp_reassembler.process_packet(pkt)
+    if reassembled_messages:
+        logger.info(f"TCP reassembler found {len(reassembled_messages)} messages!")
+    for msg_info in reassembled_messages:
+        # Process reassembled SSE messages
+        if "jsonrpc" in msg_info["message"]:
+            logger.debug(f"Reassembled {msg_info['type']}: {msg_info['message'][:100]}...")
+
+            ts = datetime.now(tz=timezone.utc)
+            log_id = str(uuid.uuid4())
+            entry = {
+                "log_id": log_id,
+                "timestamp": ts,
+                "src_ip": msg_info["src_ip"],
+                "src_port": msg_info["src_port"],
+                "dst_ip": msg_info["dst_ip"],
+                "dst_port": msg_info["dst_port"],
+                "direction": "unknown",
+                "message": msg_info["message"],
+                "traffic_type": "TCP/Direct",
+            }
+
+            # Add metadata if this is MCPHawk's own MCP traffic
+            if msg_info["src_port"] in _mcphawk_mcp_ports or msg_info["dst_port"] in _mcphawk_mcp_ports:
+                entry["metadata"] = '{"source": "mcphawk-mcp"}'
+
+            log_message(entry)
+
+            # Convert timestamp to ISO only for WebSocket broadcast
+            broadcast_entry = dict(entry)
+            broadcast_entry["timestamp"] = ts.isoformat()
+            _broadcast_in_any_loop(broadcast_entry)
+
+            # In auto-detect mode, log when we find MCP traffic
+            if _auto_detect_mode:
+                print(f"[MCPHawk] Detected {msg_info['type']} MCP traffic on port {msg_info['src_port']} -> {msg_info['dst_port']}")
+
     if pkt.haslayer(Raw):
         raw_payload = pkt[Raw].load
-        
+
         # Check if this looks like SSE data
         if raw_payload.startswith(b"data: "):
             logger.debug(f"SSE data packet detected: {raw_payload[:100]}...")
-        
+
         if not _auto_detect_mode:  # Less verbose in auto-detect mode
             logger.debug(f"Raw payload: {raw_payload[:60]}...")
 
-        # First, try to process as WebSocket traffic
-        if pkt.haslayer(TCP) and (pkt.haslayer(IP) or pkt.haslayer(IPv6)):
-            # Get IP addresses (IPv4 or IPv6)
-            if pkt.haslayer(IP):
-                src_ip = pkt[IP].src
-                dst_ip = pkt[IP].dst
-            else:  # IPv6
-                src_ip = pkt[IPv6].src
-                dst_ip = pkt[IPv6].dst
-
-            src_port = pkt[TCP].sport
-            dst_port = pkt[TCP].dport
-
-            # Check if this might be WebSocket traffic
-            is_ws_frame = False
-            is_http_upgrade = False
-
-            if len(raw_payload) > 0:
-                first_byte = raw_payload[0]
-                # Check for WebSocket frames (masked or unmasked)
-                # Valid first bytes: 0x80-0x8F (FIN=1) or 0x00-0x0F (FIN=0)
-                # With common opcodes: 0x1 (text), 0x2 (binary), 0x8 (close), 0x9 (ping), 0xa (pong)
-                # Masked client frames: 0x81 -> 0xC1, 0x82 -> 0xC2, etc.
-                is_ws_frame = (
-                    (0x80 <= first_byte <= 0x8F) or  # Unmasked frames
-                    (0x00 <= first_byte <= 0x0F) or  # Fragmented frames
-                    (0xC0 <= first_byte <= 0xCF)     # Masked frames (common case)
-                )
-
-                # Check specifically for WebSocket HTTP upgrade (not general HTTP)
-                is_http_upgrade = (
-                    (raw_payload[:3] == b'GET' and b'Upgrade: websocket' in raw_payload) or
-                    (raw_payload[:4] == b'HTTP' and b'Upgrade: websocket' in raw_payload)
-                )
-
-            # Check if this is a known WebSocket connection
-            conn_key = (src_ip, src_port, dst_ip, dst_port)
-            reverse_key = (dst_ip, dst_port, src_ip, src_port)
-            is_known_ws = conn_key in _ws_connections or reverse_key in _ws_connections
-
-            if is_ws_frame or is_http_upgrade or is_known_ws:
-                logger.debug(f"Detected WebSocket traffic: is_frame={is_ws_frame}, is_http={is_http_upgrade}, is_known={is_known_ws}, first_byte={hex(first_byte) if len(raw_payload) > 0 else 'N/A'}")
-
-                # Mark this as a WebSocket connection
-                if is_ws_frame or is_http_upgrade:
-                    _ws_connections.add(conn_key)
-                    _ws_connections.add(reverse_key)
-
-                # Process WebSocket frames
-                messages = process_ws_packet(src_ip, src_port, dst_ip, dst_port, raw_payload)
-                logger.debug(f"process_ws_packet returned {len(messages)} messages")
-
-                for msg in messages:
-                    logger.debug(f"WebSocket message captured: {msg}")
-
-                    ts = datetime.now(tz=timezone.utc)
-
-                    # In auto-detect mode, log when we find MCP traffic on a new port
-                    if _auto_detect_mode and "jsonrpc" in msg:
-                        print(f"[MCPHawk] Detected WebSocket MCP traffic on port {src_port} -> {dst_port}")
-
-                    log_id = str(uuid.uuid4())
-                    entry = {
-                        "log_id": log_id,
-                        "timestamp": ts,
-                        "src_ip": src_ip,
-                        "src_port": src_port,
-                        "dst_ip": dst_ip,
-                        "dst_port": dst_port,
-                        "direction": "unknown",
-                        "message": msg,
-                        "traffic_type": "TCP/WS",
-                    }
-                    
-                    # Add metadata if this is MCPHawk's own MCP traffic
-                    if src_port in _mcphawk_mcp_ports or dst_port in _mcphawk_mcp_ports:
-                        entry["metadata"] = '{"source": "mcphawk-mcp"}'
-
-                    log_message(entry)
-
-                    # Convert timestamp to ISO only for WebSocket broadcast
-                    broadcast_entry = dict(entry)
-                    broadcast_entry["timestamp"] = ts.isoformat()
-                    _broadcast_in_any_loop(broadcast_entry)
-
-                # If this was identified as WebSocket traffic, return early
-                # even if no complete messages were extracted (could be buffering)
-                return
-
-        # Otherwise, try to process as raw JSON-RPC or HTTP POST with JSON-RPC
+        # Try to process as raw JSON-RPC or HTTP POST with JSON-RPC
         try:
             decoded = raw_payload.decode("utf-8", errors="ignore")
-            
+
             # Debug log all HTTP traffic
             if decoded.startswith("HTTP/1.1"):
                 logger.debug(f"HTTP Response: {decoded[:200]}...")
-            
+
             # Check for standalone SSE data (not part of HTTP response)
             if decoded.startswith("data: ") and "jsonrpc" in decoded:
                 # This is a standalone SSE data packet
@@ -172,17 +122,17 @@ def packet_callback(pkt):
                     logger.debug(f"Found standalone SSE data: {sse_data[:100]}...")
                     decoded = sse_data
                     # Process as regular JSON-RPC
-            
+
             # Check for HTTP request/response with JSON-RPC content
             if (decoded.startswith("POST") or decoded.startswith("HTTP/1.1")) and "\r\n\r\n" in decoded:
                 # Extract JSON body from HTTP request/response
                 body_start = decoded.find("\r\n\r\n") + 4
                 json_body = decoded[body_start:]
-                
+
                 # Debug log HTTP responses
                 if decoded.startswith("HTTP/1.1") and "text/event-stream" in decoded:
                     logger.debug(f"SSE Response detected, body length: {len(json_body)}, body preview: {json_body[:100]}")
-                
+
                 # Check for Server-Sent Events (SSE) format used by MCP SDK
                 if "text/event-stream" in decoded and json_body.startswith("data: "):
                     # Extract JSON from SSE format: "data: {...}\n\n"
@@ -195,7 +145,7 @@ def packet_callback(pkt):
                 elif json_body.startswith("{") and "jsonrpc" in json_body:
                     decoded = json_body  # Use just the JSON body
                     logger.debug(f"Extracted JSON-RPC from HTTP: {decoded[:100]}...")
-            
+
             # Process if we have JSON-RPC content
             if decoded.startswith("{") and "jsonrpc" in decoded:
                 logger.debug(f"Sniffer captured: {decoded}")
@@ -231,7 +181,7 @@ def packet_callback(pkt):
                     "message": decoded,
                     "traffic_type": "TCP/Direct",
                 }
-                
+
                 # Add metadata if this is MCPHawk's own MCP traffic
                 if src_port in _mcphawk_mcp_ports or dst_port in _mcphawk_mcp_ports:
                     entry["metadata"] = '{"source": "mcphawk-mcp"}'

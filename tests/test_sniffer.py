@@ -175,8 +175,6 @@ class TestHTTPParsing:
     def setup_method(self):
         """Reset global state before each test."""
         import mcphawk.sniffer
-        # Clear any existing WebSocket connections
-        mcphawk.sniffer._ws_connections.clear()
         # Clear MCPHawk MCP ports
         mcphawk.sniffer._mcphawk_mcp_ports.clear()
 
@@ -266,31 +264,6 @@ class TestHTTPParsing:
         # Should not log non-JSON-RPC content
         assert not mock_log.called
 
-    @patch('mcphawk.sniffer.log_message')
-    @patch('mcphawk.sniffer._broadcast_in_any_loop')
-    def test_websocket_upgrade_detection(self, mock_broadcast, mock_log):
-        """Test that WebSocket upgrade requests are properly detected."""
-        ws_upgrade = (
-            b'GET /ws HTTP/1.1\r\n'
-            b'Host: localhost:8765\r\n'
-            b'Upgrade: websocket\r\n'
-            b'Connection: Upgrade\r\n'
-            b'\r\n'
-        )
-
-        mock_pkt = MagicMock()
-        mock_pkt.haslayer.side_effect = lambda layer: layer in [Raw, IP, TCP]
-        mock_pkt.__getitem__.side_effect = lambda layer: {
-            Raw: MagicMock(load=ws_upgrade),
-            IP: MagicMock(src="127.0.0.1", dst="127.0.0.1"),
-            TCP: MagicMock(sport=54321, dport=8765)
-        }[layer]
-
-        # This should be handled by WebSocket logic, not HTTP parsing
-        packet_callback(mock_pkt)
-
-        # Should not be logged as regular HTTP traffic
-        assert not mock_log.called
 
     @patch('mcphawk.sniffer.log_message')
     @patch('mcphawk.sniffer._broadcast_in_any_loop')
@@ -334,11 +307,9 @@ class TestHTTPParsing:
         """Test that state is properly isolated between tests."""
         import mcphawk.sniffer
         # Verify state is clean at the start of the test
-        assert len(mcphawk.sniffer._ws_connections) == 0
         assert len(mcphawk.sniffer._mcphawk_mcp_ports) == 0
 
         # Modify state
-        mcphawk.sniffer._ws_connections.add(("test", 1, "test", 2))
         mcphawk.sniffer._mcphawk_mcp_ports.add(9999)
 
         # State will be cleaned up by setup_method before next test
@@ -348,7 +319,7 @@ class TestHTTPParsing:
     def test_http_sse_response_parsing(self, mock_broadcast, mock_log):
         """Test parsing of Server-Sent Events (SSE) responses with JSON-RPC."""
         import json
-        
+
         json_content = json.dumps({
             "jsonrpc": "2.0",
             "result": {
@@ -358,7 +329,7 @@ class TestHTTPParsing:
             },
             "id": 2
         })
-        
+
         sse_response = (
             f"HTTP/1.1 200 OK\r\n"
             f"Content-Type: text/event-stream\r\n"

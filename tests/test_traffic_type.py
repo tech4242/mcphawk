@@ -1,4 +1,4 @@
-"""Test traffic_type field is properly set for TCP and WebSocket traffic."""
+"""Test traffic_type field is properly set for TCP traffic."""
 import json
 import uuid
 from datetime import datetime, timezone
@@ -38,26 +38,6 @@ def test_tcp_traffic_type(test_db):
     assert len(logs) == 1
     assert logs[0]["traffic_type"] == "TCP/Direct"
 
-
-def test_websocket_traffic_type(test_db):
-    """Test that WebSocket traffic is marked with traffic_type='WS'."""
-    entry = {
-        "log_id": str(uuid.uuid4()),
-        "timestamp": datetime.now(tz=timezone.utc),
-        "src_ip": "127.0.0.1",
-        "src_port": 8765,
-        "dst_ip": "127.0.0.1",
-        "dst_port": 54321,
-        "direction": "outgoing",
-        "message": json.dumps({"jsonrpc": "2.0", "method": "test", "id": 1}),
-        "traffic_type": "TCP/WS",
-    }
-
-    log_message(entry)
-
-    logs = fetch_logs(limit=1)
-    assert len(logs) == 1
-    assert logs[0]["traffic_type"] == "TCP/WS"
 
 
 def test_unknown_traffic_type(test_db):
