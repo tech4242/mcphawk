@@ -254,6 +254,7 @@ Vote for features by opening a GitHub issue!
 
 - [x] **Auto-detect MCP traffic** - Automatically discover MCP traffic on any port without prior configuration
 - [x] **MCP Server Interface** - Expose captured traffic via MCP server for AI agents to query and analyze traffic patterns
+- [ ] **Stdio capture** - eBPF Integration (Linux/macOS) Trace read/write system calls for pipe communication
 - [ ] **Protocol Version Detection** - Identify and display MCP protocol version from captured traffic
 - [ ] **Smart Search & Filtering** - Search by method name, params, or any JSON field with regex support
 - [ ] **Performance Analytics** - Request/response timing, method frequency charts, and latency distribution
