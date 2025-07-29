@@ -605,3 +605,176 @@ class TestMCPServer:
 
         # Clean up
         os.unlink(db_path)
+
+    @pytest.mark.asyncio
+    async def test_notification_handling(self, sample_logs):
+        """Test that notifications (requests without id) don't receive responses."""
+        from fastapi import Response
+        from fastapi.testclient import TestClient
+
+        # Create a temporary database for this test
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp_db:
+            db_path = tmp_db.name
+
+        # Initialize database
+        logger.set_db_path(db_path)
+        logger.init_db()
+
+        # Create server instance
+        server = MCPHawkServer(db_path)
+
+        # Create FastAPI app with notification handling
+        import uuid as uuid_module
+
+        from fastapi import FastAPI, Request
+        from fastapi.responses import JSONResponse
+
+        app = FastAPI(title="MCPHawk MCP Server")
+        sessions = {}
+
+        # Get references to handlers
+        handle_list_tools = server._handle_list_tools
+        handle_call_tool = server._handle_call_tool
+
+        @app.post("/mcp")
+        async def handle_mcp_request(request: Request):
+            """Handle MCP JSON-RPC requests over HTTP."""
+            try:
+                body = await request.json()
+                session_id = request.headers.get("X-Session-Id", str(uuid_module.uuid4()))
+                method = body.get("method")
+                params = body.get("params", {})
+                
+                # Check if this is a notification (no 'id' field)
+                if 'id' not in body:
+                    # This is a notification - process it but don't send a response
+                    # For now, we'll just return 204 No Content
+                    return Response(status_code=204)
+                
+                request_id = body.get("id")
+
+                if method == "initialize":
+                    sessions[session_id] = True
+                    result = {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {
+                            "experimental": {},
+                            "tools": {"listChanged": False}
+                        },
+                        "serverInfo": {
+                            "name": "mcphawk-mcp",
+                            "version": "1.12.2"
+                        }
+                    }
+                else:
+                    # Unknown method
+                    return JSONResponse(
+                        status_code=200,
+                        content={
+                            "jsonrpc": "2.0",
+                            "id": request_id,
+                            "error": {
+                                "code": -32601,
+                                "message": f"Unknown method: {method}"
+                            }
+                        }
+                    )
+
+                # Return successful response
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "result": result
+                    }
+                )
+
+            except Exception as e:
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "jsonrpc": "2.0",
+                        "id": body.get("id") if "body" in locals() else None,
+                        "error": {
+                            "code": -32603,
+                            "message": "Internal error",
+                            "data": str(e)
+                        }
+                    }
+                )
+
+        # Create test client
+        client = TestClient(app)
+
+        # Test 1: Initialize session first
+        response = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "1.0"}
+                },
+                "id": 1
+            },
+            headers={"X-Session-Id": "test-session"}
+        )
+        assert response.status_code == 200
+        assert response.json()["id"] == 1
+
+        # Test 2: Send a notification (no id field) - should get 204 No Content
+        response = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "method": "notifications/progress",
+                "params": {
+                    "progress": 50,
+                    "message": "Test progress notification"
+                }
+                # Note: no 'id' field - this makes it a notification
+            },
+            headers={"X-Session-Id": "test-session"}
+        )
+        assert response.status_code == 204
+        assert response.text == ""  # No response body
+
+        # Test 3: Send a request with id=null - should get error response
+        response = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "method": "unknown/method",
+                "params": {},
+                "id": None  # This is still a request, not a notification
+            },
+            headers={"X-Session-Id": "test-session"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] is None
+        assert "error" in data
+        assert data["error"]["code"] == -32601
+
+        # Test 4: Send a normal request - should get error for unknown method
+        response = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "method": "unknown/method",
+                "params": {},
+                "id": 123
+            },
+            headers={"X-Session-Id": "test-session"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == 123
+        assert "error" in data
+        assert data["error"]["code"] == -32601
+
+        # Clean up
+        os.unlink(db_path)

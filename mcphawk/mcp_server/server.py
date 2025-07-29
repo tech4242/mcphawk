@@ -247,7 +247,7 @@ class MCPHawkServer:
         import uuid
 
         import uvicorn
-        from fastapi import FastAPI, Request
+        from fastapi import FastAPI, Request, Response
         from fastapi.responses import JSONResponse
 
         # Create FastAPI app for HTTP transport
@@ -273,6 +273,13 @@ class MCPHawkServer:
                 # Process the JSON-RPC request
                 method = body.get("method")
                 params = body.get("params", {})
+                
+                # Check if this is a notification (no 'id' field)
+                if 'id' not in body:
+                    # This is a notification - process it but don't send a response
+                    # JSON-RPC 2.0 spec: notifications must not receive any response
+                    return Response(status_code=204)
+                
                 request_id = body.get("id")
 
                 # Handle different methods
