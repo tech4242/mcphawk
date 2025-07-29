@@ -342,3 +342,45 @@ class TestHTTPParsing:
         mcphawk.sniffer._mcphawk_mcp_ports.add(9999)
 
         # State will be cleaned up by setup_method before next test
+
+    @patch('mcphawk.sniffer.log_message')
+    @patch('mcphawk.sniffer._broadcast_in_any_loop')
+    def test_http_sse_response_parsing(self, mock_broadcast, mock_log):
+        """Test parsing of Server-Sent Events (SSE) responses with JSON-RPC."""
+        import json
+        
+        json_content = json.dumps({
+            "jsonrpc": "2.0",
+            "result": {
+                "tools": [
+                    {"name": "get_stats", "description": "Get traffic stats"}
+                ]
+            },
+            "id": 2
+        })
+        
+        sse_response = (
+            f"HTTP/1.1 200 OK\r\n"
+            f"Content-Type: text/event-stream\r\n"
+            f"Cache-Control: no-cache\r\n"
+            f"\r\n"
+            f"data: {json_content}\n\n"
+        ).encode()
+
+        mock_pkt = MagicMock()
+        mock_pkt.haslayer.side_effect = lambda layer: layer in [Raw, IP, TCP]
+        mock_pkt.__getitem__.side_effect = lambda layer: {
+            Raw: MagicMock(load=sse_response),
+            IP: MagicMock(src="127.0.0.1", dst="127.0.0.1"),
+            TCP: MagicMock(sport=8765, dport=54321)
+        }[layer]
+
+        packet_callback(mock_pkt)
+
+        # Verify the JSON-RPC was extracted from SSE format and logged
+        assert mock_log.called
+        logged_entry = mock_log.call_args[0][0]
+        assert logged_entry["message"] == json_content
+        assert logged_entry["traffic_type"] == "TCP/Direct"
+        assert logged_entry["src_port"] == 8765
+        assert logged_entry["dst_port"] == 54321

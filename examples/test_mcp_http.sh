@@ -14,7 +14,8 @@ echo "================================================"
 echo -e "\n1. Initializing MCP session..."
 curl -X POST $MCP_URL \
   -H 'Content-Type: application/json' \
-  -H "X-Session-Id: $SESSION_ID" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "initialize",
@@ -35,7 +36,8 @@ sleep 1
 echo -e "\n2. Sending initialized notification..."
 curl -X POST $MCP_URL \
   -H 'Content-Type: application/json' \
-  -H "X-Session-Id: $SESSION_ID" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "notifications/initialized",
@@ -48,7 +50,8 @@ sleep 1
 echo -e "\n3. Listing available tools..."
 curl -X POST $MCP_URL \
   -H 'Content-Type: application/json' \
-  -H "X-Session-Id: $SESSION_ID" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/list",
@@ -62,7 +65,8 @@ sleep 1
 echo -e "\n4. Getting traffic statistics..."
 curl -X POST $MCP_URL \
   -H 'Content-Type: application/json' \
-  -H "X-Session-Id: $SESSION_ID" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -79,7 +83,8 @@ sleep 1
 echo -e "\n5. Querying recent traffic (limit 10)..."
 curl -X POST $MCP_URL \
   -H 'Content-Type: application/json' \
-  -H "X-Session-Id: $SESSION_ID" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -98,7 +103,8 @@ sleep 1
 echo -e "\n6. Listing unique JSON-RPC methods..."
 curl -X POST $MCP_URL \
   -H 'Content-Type: application/json' \
-  -H "X-Session-Id: $SESSION_ID" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -115,7 +121,8 @@ sleep 1
 echo -e "\n7. Searching for 'initialize' in traffic..."
 curl -X POST $MCP_URL \
   -H 'Content-Type: application/json' \
-  -H "X-Session-Id: $SESSION_ID" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -134,7 +141,8 @@ sleep 1
 echo -e "\n8. Testing error handling (calling non-existent tool)..."
 curl -X POST $MCP_URL \
   -H 'Content-Type: application/json' \
-  -H "X-Session-Id: $SESSION_ID" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -151,7 +159,8 @@ sleep 1
 echo -e "\n9. Sending a notification..."
 curl -X POST $MCP_URL \
   -H 'Content-Type: application/json' \
-  -H "X-Session-Id: $SESSION_ID" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "notifications/progress",

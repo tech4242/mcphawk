@@ -8,9 +8,10 @@ echo "Testing with session: $SESSION_ID"
 
 # Single test request
 echo "Sending initialize request..."
-curl -X POST http://localhost:8765/mcp \
+curl -v -X POST http://localhost:8765/mcp \
   -H 'Content-Type: application/json' \
-  -H "X-Session-Id: $SESSION_ID" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $SESSION_ID" \
   -d '{
     "jsonrpc": "2.0",
     "method": "initialize",
@@ -23,6 +24,6 @@ curl -X POST http://localhost:8765/mcp \
       }
     },
     "id": 1
-  }'
+  }' 2>&1
 
 echo -e "\n\nCheck http://localhost:8000 for captured traffic"

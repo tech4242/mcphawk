@@ -57,6 +57,11 @@ def packet_callback(pkt):
 
     if pkt.haslayer(Raw):
         raw_payload = pkt[Raw].load
+        
+        # Check if this looks like SSE data
+        if raw_payload.startswith(b"data: "):
+            logger.debug(f"SSE data packet detected: {raw_payload[:100]}...")
+        
         if not _auto_detect_mode:  # Less verbose in auto-detect mode
             logger.debug(f"Raw payload: {raw_payload[:60]}...")
 
@@ -153,12 +158,41 @@ def packet_callback(pkt):
         try:
             decoded = raw_payload.decode("utf-8", errors="ignore")
             
+            # Debug log all HTTP traffic
+            if decoded.startswith("HTTP/1.1"):
+                logger.debug(f"HTTP Response: {decoded[:200]}...")
+            
+            # Check for standalone SSE data (not part of HTTP response)
+            if decoded.startswith("data: ") and "jsonrpc" in decoded:
+                # This is a standalone SSE data packet
+                sse_data = decoded[6:]  # Skip "data: "
+                if "\n" in sse_data:
+                    sse_data = sse_data[:sse_data.index("\n")]
+                if sse_data.startswith("{"):
+                    logger.debug(f"Found standalone SSE data: {sse_data[:100]}...")
+                    decoded = sse_data
+                    # Process as regular JSON-RPC
+            
             # Check for HTTP request/response with JSON-RPC content
             if (decoded.startswith("POST") or decoded.startswith("HTTP/1.1")) and "\r\n\r\n" in decoded:
                 # Extract JSON body from HTTP request/response
                 body_start = decoded.find("\r\n\r\n") + 4
                 json_body = decoded[body_start:]
-                if json_body.startswith("{") and "jsonrpc" in json_body:
+                
+                # Debug log HTTP responses
+                if decoded.startswith("HTTP/1.1") and "text/event-stream" in decoded:
+                    logger.debug(f"SSE Response detected, body length: {len(json_body)}, body preview: {json_body[:100]}")
+                
+                # Check for Server-Sent Events (SSE) format used by MCP SDK
+                if "text/event-stream" in decoded and json_body.startswith("data: "):
+                    # Extract JSON from SSE format: "data: {...}\n\n"
+                    sse_data = json_body[6:]  # Skip "data: "
+                    if "\n" in sse_data:
+                        sse_data = sse_data[:sse_data.index("\n")]
+                    if sse_data.startswith("{") and "jsonrpc" in sse_data:
+                        decoded = sse_data
+                        logger.debug(f"Extracted JSON-RPC from SSE: {decoded[:100]}...")
+                elif json_body.startswith("{") and "jsonrpc" in json_body:
                     decoded = json_body  # Use just the JSON body
                     logger.debug(f"Extracted JSON-RPC from HTTP: {decoded[:100]}...")
             

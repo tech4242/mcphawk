@@ -220,3 +220,210 @@ def get_log_by_id(log_id: str) -> dict[str, Any] | None:
         "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
         "metadata": row["metadata"],
     }
+
+
+def fetch_logs_with_offset(limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    """
+    Fetch logs with limit and offset for pagination.
+
+    Args:
+        limit: Maximum number of logs to return
+        offset: Number of logs to skip
+
+    Returns:
+        List of dictionaries matching MCPMessageLog format.
+    """
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    if not current_path.exists():
+        return []
+
+    conn = sqlite3.connect(current_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type, metadata
+        FROM logs
+        ORDER BY log_id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset),
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    return [
+        {
+            "log_id": row["log_id"],
+            "timestamp": datetime.fromisoformat(row["timestamp"]),
+            "src_ip": row["src_ip"],
+            "dst_ip": row["dst_ip"],
+            "src_port": row["src_port"],
+            "dst_port": row["dst_port"],
+            "direction": row["direction"],
+            "message": row["message"],
+            "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
+            "metadata": row["metadata"],
+        }
+        for row in rows
+    ]
+
+
+def search_logs(search_term: str = "", message_type: str | None = None, 
+                traffic_type: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    """
+    Search logs by various criteria.
+
+    Args:
+        search_term: Text to search for in messages
+        message_type: Filter by JSON-RPC message type (request, response, notification)
+        traffic_type: Filter by traffic type (TCP/WS, TCP/Direct)
+        limit: Maximum number of results
+
+    Returns:
+        List of matching log entries.
+    """
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    if not current_path.exists():
+        return []
+
+    conn = sqlite3.connect(current_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    
+    query = "SELECT * FROM logs WHERE 1=1"
+    params = []
+    
+    if search_term:
+        query += " AND message LIKE ?"
+        params.append(f"%{search_term}%")
+    
+    if traffic_type:
+        query += " AND traffic_type = ?"
+        params.append(traffic_type)
+    
+    query += " ORDER BY log_id DESC LIMIT ?"
+    params.append(limit)
+    
+    cur.execute(query, params)
+    rows = cur.fetchall()
+    conn.close()
+    
+    # Filter by message type if specified
+    results = []
+    for row in rows:
+        log_dict = {
+            "log_id": row["log_id"],
+            "timestamp": datetime.fromisoformat(row["timestamp"]),
+            "src_ip": row["src_ip"],
+            "dst_ip": row["dst_ip"],
+            "src_port": row["src_port"],
+            "dst_port": row["dst_port"],
+            "direction": row["direction"],
+            "message": row["message"],
+            "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
+            "metadata": row["metadata"],
+        }
+        
+        # If message_type filter is specified, check it
+        if message_type:
+            from .utils import get_message_type
+            if get_message_type(row["message"]) != message_type:
+                continue
+                
+        results.append(log_dict)
+    
+    return results
+
+
+def get_traffic_stats() -> dict[str, Any]:
+    """
+    Get statistics about captured traffic.
+
+    Returns:
+        Dictionary with traffic statistics.
+    """
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    if not current_path.exists():
+        return {
+            "total_logs": 0,
+            "requests": 0,
+            "responses": 0,
+            "notifications": 0,
+            "errors": 0,
+            "by_traffic_type": {}
+        }
+
+    conn = sqlite3.connect(current_path)
+    cur = conn.cursor()
+    
+    # Get all messages for analysis
+    cur.execute("SELECT message, traffic_type FROM logs")
+    logs = cur.fetchall()
+    
+    stats = {
+        "total_logs": len(logs),
+        "requests": 0,
+        "responses": 0,
+        "notifications": 0,
+        "errors": 0,
+        "by_traffic_type": {}
+    }
+    
+    from .utils import get_message_type
+    
+    for message, traffic_type in logs:
+        # Count by message type
+        msg_type = get_message_type(message)
+        if msg_type == "request":
+            stats["requests"] += 1
+        elif msg_type == "response":
+            stats["responses"] += 1
+        elif msg_type == "notification":
+            stats["notifications"] += 1
+        
+        # Check for errors
+        try:
+            import json
+            msg_data = json.loads(message)
+            if "error" in msg_data:
+                stats["errors"] += 1
+        except:
+            pass
+        
+        # Count by traffic type
+        if traffic_type:
+            stats["by_traffic_type"][traffic_type] = stats["by_traffic_type"].get(traffic_type, 0) + 1
+    
+    conn.close()
+    return stats
+
+
+def get_unique_methods() -> list[str]:
+    """
+    Get all unique JSON-RPC methods from captured traffic.
+
+    Returns:
+        Sorted list of unique method names.
+    """
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    if not current_path.exists():
+        return []
+
+    conn = sqlite3.connect(current_path)
+    cur = conn.cursor()
+    cur.execute("SELECT message FROM logs")
+    logs = cur.fetchall()
+    conn.close()
+    
+    methods = set()
+    for (message,) in logs:
+        try:
+            import json
+            msg_data = json.loads(message)
+            if "method" in msg_data:
+                methods.add(msg_data["method"])
+        except:
+            pass
+    
+    return sorted(list(methods))

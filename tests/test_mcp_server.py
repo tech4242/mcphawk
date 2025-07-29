@@ -77,11 +77,11 @@ class TestMCPServer:
     def test_server_initialization(self, test_db):
         """Test server initializes correctly."""
         server = MCPHawkServer(str(test_db))
-        assert server.server.name == "mcphawk-mcp"
+        assert server.mcp.name == "mcphawk-mcp"
 
-        # Check that handlers were registered
-        assert hasattr(server.server, 'list_tools')
-        assert hasattr(server.server, 'call_tool')
+        # Check that FastMCP instance was created
+        assert hasattr(server, 'mcp')
+        assert hasattr(server.mcp, 'tool')
 
     @pytest.mark.asyncio
     async def test_list_tools_handler(self, test_db):
