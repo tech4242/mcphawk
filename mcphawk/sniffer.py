@@ -57,9 +57,22 @@ def packet_callback(pkt):
             return
 
     # Try TCP stream reassembly first for SSE/chunked responses
+    if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+        tcp = pkt[TCP]
+        if tcp.sport == 8765 or tcp.dport == 8765:
+            raw_data = bytes(pkt[Raw])
+            logger.debug(f"TCP packet for reassembly: {tcp.sport}->{tcp.dport}, {len(raw_data)} bytes")
+            # Log first 100 bytes to see what we're getting
+            preview = raw_data[:100].decode('utf-8', errors='replace')
+            logger.debug(f"Packet preview: {preview!r}")
+
     reassembled_messages = _tcp_reassembler.process_packet(pkt)
     if reassembled_messages:
         logger.info(f"TCP reassembler found {len(reassembled_messages)} messages!")
+    elif pkt.haslayer(TCP) and pkt.haslayer(Raw):
+        tcp = pkt[TCP]
+        if tcp.sport == 8765 or tcp.dport == 8765:
+            logger.debug(f"TCP reassembler returned no messages for {tcp.sport}->{tcp.dport}")
     for msg_info in reassembled_messages:
         # Process reassembled SSE messages
         if "jsonrpc" in msg_info["message"]:
