@@ -29,7 +29,7 @@ def init_db() -> None:
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            log_id TEXT PRIMARY KEY,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             src_ip TEXT,
             dst_ip TEXT,
@@ -37,16 +37,11 @@ def init_db() -> None:
             dst_port INTEGER,
             direction TEXT CHECK(direction IN ('incoming', 'outgoing', 'unknown')),
             message TEXT,
-            traffic_type TEXT
+            transport_type TEXT,
+            metadata TEXT
         )
         """
     )
-
-    # Add traffic_type column to existing tables
-    cur.execute("PRAGMA table_info(logs)")
-    columns = [col[1] for col in cur.fetchall()]
-    if "traffic_type" not in columns:
-        cur.execute("ALTER TABLE logs ADD COLUMN traffic_type TEXT")
     conn.commit()
     conn.close()
 
@@ -57,6 +52,7 @@ def log_message(entry: dict[str, Any]) -> None:
 
     Args:
         entry (Dict[str, Any]): Must contain MCPMessageLog fields:
+            log_id (str) - UUID for the log entry
             timestamp (datetime) - If missing, current time is used
             src_ip (str)
             dst_ip (str)
@@ -64,17 +60,23 @@ def log_message(entry: dict[str, Any]) -> None:
             dst_port (int)
             direction (str): 'incoming', 'outgoing', or 'unknown'
             message (str)
-            traffic_type (str): 'TCP', 'WS', or 'N/A' (optional, defaults to 'N/A')
+            transport_type (str): 'streamable_http', 'http_sse', 'stdio', or 'unknown' (optional, defaults to 'unknown')
+            metadata (str): JSON string with additional metadata (optional)
     """
     timestamp = entry.get("timestamp", datetime.now(tz=timezone.utc))
+    log_id = entry.get("log_id")
+    if not log_id:
+        raise ValueError("log_id is required")
+
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO logs (timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
+            log_id,
             timestamp.isoformat(),
             entry.get("src_ip"),
             entry.get("dst_ip"),
@@ -82,7 +84,8 @@ def log_message(entry: dict[str, Any]) -> None:
             entry.get("dst_port"),
             entry.get("direction", "unknown"),
             entry.get("message"),
-            entry.get("traffic_type", "N/A"),
+            entry.get("transport_type", "unknown"),
+            entry.get("metadata"),
         ),
     )
     conn.commit()
@@ -113,9 +116,9 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata
         FROM logs
-        ORDER BY id DESC
+        ORDER BY timestamp DESC
         LIMIT ?
         """,
         (limit,),
@@ -125,6 +128,7 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
 
     return [
         {
+            "log_id": row["log_id"],
             "timestamp": datetime.fromisoformat(row["timestamp"]),
             "src_ip": row["src_ip"],
             "dst_ip": row["dst_ip"],
@@ -132,7 +136,8 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
             "dst_port": row["dst_port"],
             "direction": row["direction"],
             "message": row["message"],
-            "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
+            "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
+            "metadata": row["metadata"],
         }
         for row in rows
     ]
@@ -162,3 +167,255 @@ def clear_logs() -> None:
     cur.execute("DELETE FROM logs;")
     conn.commit()
     conn.close()
+
+
+def get_log_by_id(log_id: str) -> dict[str, Any] | None:
+    """
+    Fetch a specific log entry by ID.
+
+    Args:
+        log_id (str): The UUID of the log entry to retrieve.
+
+    Returns:
+        Dictionary matching MCPMessageLog format or None if not found.
+    """
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    if not current_path.exists():
+        return None
+
+    conn = sqlite3.connect(current_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata
+        FROM logs
+        WHERE log_id = ?
+        """,
+        (log_id,),
+    )
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    return {
+        "log_id": row["log_id"],
+        "timestamp": datetime.fromisoformat(row["timestamp"]),
+        "src_ip": row["src_ip"],
+        "dst_ip": row["dst_ip"],
+        "src_port": row["src_port"],
+        "dst_port": row["dst_port"],
+        "direction": row["direction"],
+        "message": row["message"],
+        "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
+        "metadata": row["metadata"],
+    }
+
+
+def fetch_logs_with_offset(limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    """
+    Fetch logs with limit and offset for pagination.
+
+    Args:
+        limit: Maximum number of logs to return
+        offset: Number of logs to skip
+
+    Returns:
+        List of dictionaries matching MCPMessageLog format.
+    """
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    if not current_path.exists():
+        return []
+
+    conn = sqlite3.connect(current_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata
+        FROM logs
+        ORDER BY log_id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset),
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    return [
+        {
+            "log_id": row["log_id"],
+            "timestamp": datetime.fromisoformat(row["timestamp"]),
+            "src_ip": row["src_ip"],
+            "dst_ip": row["dst_ip"],
+            "src_port": row["src_port"],
+            "dst_port": row["dst_port"],
+            "direction": row["direction"],
+            "message": row["message"],
+            "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
+            "metadata": row["metadata"],
+        }
+        for row in rows
+    ]
+
+
+def search_logs(search_term: str = "", message_type: str | None = None,
+                transport_type: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    """
+    Search logs by various criteria.
+
+    Args:
+        search_term: Text to search for in messages
+        message_type: Filter by JSON-RPC message type (request, response, notification)
+        transport_type: Filter by transport type (streamable_http, http_sse, stdio, unknown)
+        limit: Maximum number of results
+
+    Returns:
+        List of matching log entries.
+    """
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    if not current_path.exists():
+        return []
+
+    conn = sqlite3.connect(current_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    query = "SELECT * FROM logs WHERE 1=1"
+    params = []
+
+    if search_term:
+        query += " AND message LIKE ?"
+        params.append(f"%{search_term}%")
+
+    if transport_type:
+        query += " AND transport_type = ?"
+        params.append(transport_type)
+
+    query += " ORDER BY log_id DESC LIMIT ?"
+    params.append(limit)
+
+    cur.execute(query, params)
+    rows = cur.fetchall()
+    conn.close()
+
+    # Filter by message type if specified
+    results = []
+    for row in rows:
+        log_dict = {
+            "log_id": row["log_id"],
+            "timestamp": datetime.fromisoformat(row["timestamp"]),
+            "src_ip": row["src_ip"],
+            "dst_ip": row["dst_ip"],
+            "src_port": row["src_port"],
+            "dst_port": row["dst_port"],
+            "direction": row["direction"],
+            "message": row["message"],
+            "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
+            "metadata": row["metadata"],
+        }
+
+        # If message_type filter is specified, check it
+        if message_type:
+            from .utils import get_message_type
+            if get_message_type(row["message"]) != message_type:
+                continue
+
+        results.append(log_dict)
+
+    return results
+
+
+def get_traffic_stats() -> dict[str, Any]:
+    """
+    Get statistics about captured traffic.
+
+    Returns:
+        Dictionary with traffic statistics.
+    """
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    if not current_path.exists():
+        return {
+            "total_logs": 0,
+            "requests": 0,
+            "responses": 0,
+            "notifications": 0,
+            "errors": 0,
+            "by_transport_type": {}
+        }
+
+    conn = sqlite3.connect(current_path)
+    cur = conn.cursor()
+
+    # Get all messages for analysis
+    cur.execute("SELECT message, transport_type FROM logs")
+    logs = cur.fetchall()
+
+    stats = {
+        "total_logs": len(logs),
+        "requests": 0,
+        "responses": 0,
+        "notifications": 0,
+        "errors": 0,
+        "by_transport_type": {}
+    }
+
+    from .utils import get_message_type
+
+    for message, transport_type in logs:
+        # Count by message type
+        msg_type = get_message_type(message)
+        if msg_type == "request":
+            stats["requests"] += 1
+        elif msg_type == "response":
+            stats["responses"] += 1
+        elif msg_type == "notification":
+            stats["notifications"] += 1
+
+        # Check for errors
+        try:
+            import json
+            msg_data = json.loads(message)
+            if "error" in msg_data:
+                stats["errors"] += 1
+        except Exception:
+            pass
+
+        # Count by transport type
+        if transport_type:
+            stats["by_transport_type"][transport_type] = stats["by_transport_type"].get(transport_type, 0) + 1
+
+    conn.close()
+    return stats
+
+
+def get_unique_methods() -> list[str]:
+    """
+    Get all unique JSON-RPC methods from captured traffic.
+
+    Returns:
+        Sorted list of unique method names.
+    """
+    current_path = DB_PATH if DB_PATH else _DEFAULT_DB_PATH
+    if not current_path.exists():
+        return []
+
+    conn = sqlite3.connect(current_path)
+    cur = conn.cursor()
+    cur.execute("SELECT message FROM logs")
+    logs = cur.fetchall()
+    conn.close()
+
+    methods = set()
+    for (message,) in logs:
+        try:
+            import json
+            msg_data = json.loads(message)
+            if "method" in msg_data:
+                methods.add(msg_data["method"])
+        except Exception:
+            pass
+
+    return sorted(methods)

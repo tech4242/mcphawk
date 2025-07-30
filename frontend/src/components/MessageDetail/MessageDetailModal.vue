@@ -41,11 +41,19 @@
                   <div>
                     <span class="text-gray-500 dark:text-gray-400">Type:</span>
                     <MessageTypeBadge :type="messageType" class="ml-2" />
+                    <span v-if="isMcpHawkTraffic" 
+                          class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                          title="MCPHawk's own MCP traffic">
+                      MCP🦅
+                    </span>
                   </div>
                   <div>
-                    <span class="text-gray-500 dark:text-gray-400">Traffic:</span>
-                    <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
-                      {{ logStore.selectedLog.traffic_type || 'N/A' }}
+                    <span class="text-gray-500 dark:text-gray-400">Transport:</span>
+                    <span 
+                      class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                      :class="transportTypeColor"
+                    >
+                      {{ formattedTransportType }}
                     </span>
                   </div>
                   <div>
@@ -118,6 +126,7 @@ import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } fro
 import { ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
 import { useLogStore } from '@/stores/logs'
 import { getMessageType, parseMessage } from '@/utils/messageParser'
+import { formatTransportType, getTransportTypeColor } from '@/utils/transportFormatter'
 import MessageTypeBadge from '@/components/LogTable/MessageTypeBadge.vue'
 import PairedMessages from '@/components/common/PairedMessages.vue'
 
@@ -133,6 +142,26 @@ const formattedJson = computed(() => {
   if (!logStore.selectedLog) return ''
   const parsed = parseMessage(logStore.selectedLog.message)
   return JSON.stringify(parsed, null, 2)
+})
+
+const isMcpHawkTraffic = computed(() => {
+  if (!logStore.selectedLog?.metadata) return false
+  try {
+    const meta = JSON.parse(logStore.selectedLog.metadata)
+    return meta.source === 'mcphawk-mcp'
+  } catch {
+    return false
+  }
+})
+
+const formattedTransportType = computed(() => {
+  if (!logStore.selectedLog) return 'Unknown'
+  return formatTransportType(logStore.selectedLog.transport_type || logStore.selectedLog.traffic_type || 'unknown')
+})
+
+const transportTypeColor = computed(() => {
+  if (!logStore.selectedLog) return ''
+  return getTransportTypeColor(logStore.selectedLog.transport_type || logStore.selectedLog.traffic_type || 'unknown')
 })
 
 async function copyToClipboard() {

@@ -15,6 +15,9 @@ from mcphawk.web.broadcaster import active_clients
 # Set up logger for this module
 logger = logging.getLogger(__name__)
 
+# Global flag to track if web server was started with MCP
+_with_mcp = False
+
 app = FastAPI()
 
 # Allow local UI dev or CDN-based dashboard
@@ -25,6 +28,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/status")
+def get_status():
+    """
+    Get server status including MCP server status.
+    """
+    return JSONResponse(content={
+        "with_mcp": _with_mcp
+    })
 
 
 @app.get("/logs")
@@ -44,7 +57,7 @@ def get_logs(limit: int = 50):
         {
             **log,
             "timestamp": log["timestamp"].isoformat(),  # ensure JSON-friendly
-            "traffic_type": log.get("traffic_type", "N/A")  # ensure traffic_type is included
+            "transport_type": log.get("transport_type", "unknown")  # ensure transport_type is included
         }
         for log in logs
     ])
@@ -83,7 +96,7 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.debug(f"WebSocket disconnected: {len(active_clients)} active clients")
 
 
-def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False, debug: bool = False):
+def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False, debug: bool = False, excluded_ports: Optional[list[int]] = None, mcphawk_mcp_ports: Optional[list[int]] = None):
     """
     Start the sniffer in a dedicated daemon thread.
 
@@ -91,18 +104,20 @@ def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False, debug: bo
         filter_expr: BPF filter expression for the sniffer.
         auto_detect: Whether to auto-detect MCP traffic.
         debug: Whether to enable debug logging.
+        excluded_ports: List of ports to exclude from capture.
+        mcphawk_mcp_ports: List of ports where MCPHawk's own MCP server is running.
     """
     from mcphawk.sniffer import start_sniffer
 
     def safe_start():
         logger.debug(f"Sniffer thread starting with filter: {filter_expr}, auto_detect: {auto_detect}")
-        return start_sniffer(filter_expr=filter_expr, auto_detect=auto_detect, debug=debug)
+        return start_sniffer(filter_expr=filter_expr, auto_detect=auto_detect, debug=debug, excluded_ports=excluded_ports, mcphawk_mcp_ports=mcphawk_mcp_ports)
 
     thread = threading.Thread(target=safe_start, daemon=True)
     thread.start()
 
 
-def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: Optional[str] = None, auto_detect: bool = False, debug: bool = False):
+def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: Optional[str] = None, auto_detect: bool = False, debug: bool = False, excluded_ports: Optional[list[int]] = None, with_mcp: bool = False, mcphawk_mcp_ports: Optional[list[int]] = None):
     """
     Run the web server and optionally the sniffer.
 
@@ -114,10 +129,14 @@ def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, fil
         auto_detect: Whether to auto-detect MCP traffic.
         debug: Whether to enable debug logging.
     """
+    # Set global MCP flag
+    global _with_mcp
+    _with_mcp = with_mcp
+
     if sniffer:
         if not filter_expr:
             raise ValueError("filter_expr is required when sniffer is enabled")
-        _start_sniffer_thread(filter_expr, auto_detect, debug)
+        _start_sniffer_thread(filter_expr, auto_detect, debug, excluded_ports, mcphawk_mcp_ports)
 
     if sniffer:
         print(f"[MCPHawk] Starting sniffer and dashboard on http://{host}:{port}")

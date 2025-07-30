@@ -132,7 +132,7 @@ def test_run_web_with_sniffer():
         )
 
         # Verify sniffer was started
-        mock_start_sniffer.assert_called_once_with("tcp port 3000", False, True)
+        mock_start_sniffer.assert_called_once_with("tcp port 3000", False, True, None, None)
 
         # Verify uvicorn was started with correct params
         mock_uvicorn.assert_called_once()
@@ -172,3 +172,32 @@ def test_run_web_sniffer_without_filter():
     # Test that ValueError is raised when sniffer=True but no filter_expr
     with pytest.raises(ValueError, match="filter_expr is required"):
         run_web(sniffer=True, filter_expr=None)
+
+
+def test_status_endpoint(client):
+    """Test /status endpoint returns MCP server status."""
+    response = client.get("/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert "with_mcp" in data
+    assert isinstance(data["with_mcp"], bool)
+
+
+def test_status_endpoint_with_mcp_enabled():
+    """Test /status endpoint when MCP is enabled."""
+    import mcphawk.web.server
+    from mcphawk.web.server import app
+
+    # Set MCP flag
+    original_value = mcphawk.web.server._with_mcp
+    mcphawk.web.server._with_mcp = True
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/status")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["with_mcp"] is True
+    finally:
+        # Restore original value
+        mcphawk.web.server._with_mcp = original_value

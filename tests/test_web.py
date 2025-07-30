@@ -8,6 +8,7 @@ Covers:
 
 import os
 import tempfile
+import uuid
 from datetime import datetime, timezone
 
 import pytest
@@ -55,22 +56,33 @@ def clean_db(setup_test_db):
     yield
 
 
+def create_test_log(message, **kwargs):
+    """Helper to create a log entry with required log_id."""
+    entry = {
+        "log_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc),
+        "src_ip": "127.0.0.1",
+        "dst_ip": "127.0.0.1",
+        "message": message,
+    }
+    entry.update(kwargs)
+    return entry
+
+
 def test_get_logs_limit(setup_test_db):
     """
     Ensure /logs returns valid JSON and respects the limit parameter.
     """
     # Insert two logs for testing
-    log_message(
-        {
-            "timestamp": datetime.now(timezone.utc),
+    log_message({
+        "log_id": str(uuid.uuid4()),"timestamp": datetime.now(timezone.utc),
             "src_ip": "127.0.0.1",
             "dst_ip": "127.0.0.1",
             "message": '{"jsonrpc":"2.0","method":"ping"}',
         }
     )
-    log_message(
-        {
-            "timestamp": datetime.now(timezone.utc),
+    log_message({
+        "log_id": str(uuid.uuid4()),"timestamp": datetime.now(timezone.utc),
             "src_ip": "127.0.0.1",
             "dst_ip": "127.0.0.1",
             "message": '{"jsonrpc":"2.0","method":"pong"}',
@@ -92,17 +104,15 @@ def test_get_logs_multiple(setup_test_db):
     Ensure /logs can return multiple rows when more logs are inserted.
     """
     # Insert multiple logs
-    log_message(
-        {
-            "timestamp": datetime.now(timezone.utc),
+    log_message({
+        "log_id": str(uuid.uuid4()),"timestamp": datetime.now(timezone.utc),
             "src_ip": "127.0.0.1",
             "dst_ip": "127.0.0.1",
             "message": '{"jsonrpc":"2.0","method":"ping"}',
         }
     )
-    log_message(
-        {
-            "timestamp": datetime.now(timezone.utc),
+    log_message({
+        "log_id": str(uuid.uuid4()),"timestamp": datetime.now(timezone.utc),
             "src_ip": "127.0.0.1",
             "dst_ip": "127.0.0.1",
             "message": '{"jsonrpc":"2.0","method":"pong"}',
@@ -153,7 +163,7 @@ def test_logs_persist_across_requests(setup_test_db):
     """Test that logs persist between different API requests."""
     # Add a log
     log_message({
-        "timestamp": datetime.now(timezone.utc),
+        "log_id": str(uuid.uuid4()),"timestamp": datetime.now(timezone.utc),
         "src_ip": "192.168.1.1",
         "dst_ip": "192.168.1.2",
         "src_port": 12345,
@@ -184,7 +194,7 @@ def test_logs_order_newest_first(setup_test_db):
     # Add logs with small delays to ensure different timestamps
     for i in range(3):
         log_message({
-            "timestamp": datetime.now(timezone.utc),
+        "log_id": str(uuid.uuid4()),"timestamp": datetime.now(timezone.utc),
             "src_ip": "127.0.0.1",
             "dst_ip": "127.0.0.1",
             "src_port": 12345,
@@ -210,7 +220,7 @@ def test_logs_default_limit(setup_test_db):
     # Add 60 logs
     for i in range(60):
         log_message({
-            "timestamp": datetime.now(timezone.utc),
+        "log_id": str(uuid.uuid4()),"timestamp": datetime.now(timezone.utc),
             "src_ip": "127.0.0.1",
             "dst_ip": "127.0.0.1",
             "src_port": 12345,
@@ -229,6 +239,7 @@ def test_logs_default_limit(setup_test_db):
 def test_log_fields_preserved_in_api(setup_test_db):
     """Test that all log fields are preserved through the API."""
     test_entry = {
+        "log_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc),
         "src_ip": "10.0.0.1",
         "dst_ip": "10.0.0.2",

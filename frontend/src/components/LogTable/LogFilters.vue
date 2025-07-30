@@ -48,6 +48,21 @@
         <span class="hidden sm:inline">{{ logStore.expandAll ? 'Collapse' : 'Expand' }}</span>
       </button>
 
+      <!-- Toggle MCPHawk traffic -->
+      <button
+        @click="logStore.toggleMcpHawkTraffic"
+        class="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+        :class="[
+          logStore.showMcpHawkTraffic
+            ? 'bg-purple-600 text-white'
+            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+        ]"
+        :title="logStore.showMcpHawkTraffic ? 'Hide MCPHawk\'s own MCP traffic' : 'Show MCPHawk\'s own MCP traffic'"
+      >
+        <FunnelIcon class="h-5 w-5" />
+        <span class="hidden lg:inline">MCPHawk</span>
+      </button>
+
       <!-- Clear logs -->
       <button
         @click="handleClearLogs"
@@ -72,7 +87,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useLogStore } from '@/stores/logs'
-import { MagnifyingGlassIcon, TrashIcon, ArrowPathIcon, CodeBracketIcon } from '@heroicons/vue/24/outline'
+import { MagnifyingGlassIcon, TrashIcon, ArrowPathIcon, CodeBracketIcon, FunnelIcon } from '@heroicons/vue/24/outline'
 
 const logStore = useLogStore()
 

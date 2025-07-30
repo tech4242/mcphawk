@@ -17,14 +17,26 @@
             <td class="px-4 py-3 text-left w-32 text-sm text-gray-900 dark:text-gray-100">
               {{ formatTimestamp(log.timestamp) }}
             </td>
-            <td class="px-4 py-3 text-left w-28">
-              <MessageTypeBadge :type="messageType" />
+            <td class="px-4 py-3 text-left w-40">
+              <div class="flex items-center gap-2 whitespace-nowrap">
+                <MessageTypeBadge :type="messageType" />
+                <span v-if="isMcpHawkTraffic" 
+                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                      title="MCPHawk's own MCP traffic">
+                  MCP🦅
+                </span>
+              </div>
             </td>
             <td class="px-4 py-3 text-left text-sm text-gray-900 dark:text-gray-100 font-mono truncate">
               {{ messageSummary }}
             </td>
             <td class="px-4 py-3 text-left w-32 text-sm text-gray-500 dark:text-gray-400 font-mono">
-              {{ log.traffic_type || 'N/A' }}
+              <span 
+                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                :class="transportTypeColor"
+              >
+                {{ formattedTransportType }}
+              </span>
             </td>
             <td class="px-4 py-3 text-left w-48 text-sm text-gray-500 dark:text-gray-400">
               <div class="flex items-center">
@@ -59,6 +71,7 @@
 <script setup>
 import { computed } from 'vue'
 import { getMessageType, getMessageSummary, formatTimestamp, formatDate, getPortInfo, getDirectionIcon } from '@/utils/messageParser'
+import { formatTransportType, getTransportTypeColor } from '@/utils/transportFormatter'
 import MessageTypeBadge from './MessageTypeBadge.vue'
 import PairedMessages from '@/components/common/PairedMessages.vue'
 
@@ -95,6 +108,24 @@ const formattedJson = computed(() => {
   } catch {
     return props.log.message
   }
+})
+
+const isMcpHawkTraffic = computed(() => {
+  if (!props.log.metadata) return false
+  try {
+    const meta = JSON.parse(props.log.metadata)
+    return meta.source === 'mcphawk-mcp'
+  } catch {
+    return false
+  }
+})
+
+const formattedTransportType = computed(() => {
+  return formatTransportType(props.log.transport_type || props.log.traffic_type || 'unknown')
+})
+
+const transportTypeColor = computed(() => {
+  return getTransportTypeColor(props.log.transport_type || props.log.traffic_type || 'unknown')
 })
 
 </script>

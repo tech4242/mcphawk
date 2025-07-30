@@ -16,14 +16,14 @@
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32">
               Time
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28">
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-40">
               Type
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
               Message
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32">
-              Traffic
+              Transport
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-48">
               Source → Dest
@@ -36,10 +36,10 @@
         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
           <LogRow
             v-for="log in displayLogs"
-            :key="log.id || `${log.timestamp}-${log.src_port}`"
+            :key="log.log_id"
             :log="log"
             :all-logs="logStore.logs"
-            :is-selected="logStore.selectedLogId === log.id"
+            :is-selected="logStore.selectedLogId === log.log_id"
             :is-expanded="logStore.expandAll"
             @click="handleLogClick(log)"
           />
@@ -75,10 +75,6 @@ const logStore = useLogStore()
 const displayLogs = computed(() => logStore.filteredLogs)
 
 function handleLogClick(log) {
-  // Generate ID if missing (for compatibility)
-  if (!log.id) {
-    log.id = `${log.timestamp}-${log.src_port}-${Math.random()}`
-  }
-  logStore.selectLog(log.id)
+  logStore.selectLog(log.log_id)
 }
 </script>

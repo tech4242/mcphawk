@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from scapy.all import Ether
 from scapy.layers.inet import IP, TCP
+from scapy.layers.inet6 import IPv6
 from scapy.packet import Raw
 
 from mcphawk.logger import init_db, set_db_path
@@ -85,7 +86,7 @@ def test_packet_callback(clean_db, dummy_server):
 
     conn = sqlite3.connect(TEST_DB)
     cur = conn.cursor()
-    cur.execute("SELECT message FROM logs ORDER BY id DESC LIMIT 1;")
+    cur.execute("SELECT message FROM logs ORDER BY log_id DESC LIMIT 1;")
     logged_msg = cur.fetchone()[0]
     conn.close()
 
@@ -166,3 +167,191 @@ class TestAutoDetect:
         mock_sniff.assert_called_once()
         call_kwargs = mock_sniff.call_args[1]
         assert call_kwargs["filter"] == "tcp"
+
+
+class TestHTTPParsing:
+    """Test HTTP request/response parsing for MCP over HTTP."""
+
+    def setup_method(self):
+        """Reset global state before each test."""
+        import mcphawk.sniffer
+        # Clear MCPHawk MCP ports
+        mcphawk.sniffer._mcphawk_mcp_ports.clear()
+
+    @patch('mcphawk.sniffer.log_message')
+    @patch('mcphawk.sniffer._broadcast_in_any_loop')
+    def test_http_post_request_parsing(self, mock_broadcast, mock_log):
+        """Test parsing of HTTP POST request with JSON-RPC body."""
+        http_request = (
+            b'POST /mcp HTTP/1.1\r\n'
+            b'Host: localhost:8765\r\n'
+            b'Content-Type: application/json\r\n'
+            b'Content-Length: 89\r\n'
+            b'\r\n'
+            b'{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05"},"id":1}'
+        )
+
+        mock_pkt = MagicMock()
+        mock_pkt.haslayer.side_effect = lambda layer: layer in [Raw, IP, TCP]
+        mock_pkt.__getitem__.side_effect = lambda layer: {
+            Raw: MagicMock(load=http_request),
+            IP: MagicMock(src="127.0.0.1", dst="127.0.0.1"),
+            TCP: MagicMock(sport=54321, dport=8765)
+        }[layer]
+
+        packet_callback(mock_pkt)
+
+        # Verify the JSON-RPC body was extracted and logged
+        assert mock_log.called
+        logged_entry = mock_log.call_args[0][0]
+        assert logged_entry["message"] == '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05"},"id":1}'
+        assert logged_entry["transport_type"] == "unknown"
+        assert logged_entry["src_port"] == 54321
+        assert logged_entry["dst_port"] == 8765
+
+    @patch('mcphawk.sniffer.log_message')
+    @patch('mcphawk.sniffer._broadcast_in_any_loop')
+    def test_http_response_parsing(self, mock_broadcast, mock_log):
+        """Test parsing of HTTP response with JSON-RPC body."""
+        http_response = (
+            b'HTTP/1.1 200 OK\r\n'
+            b'Content-Type: application/json\r\n'
+            b'Content-Length: 50\r\n'
+            b'\r\n'
+            b'{"jsonrpc":"2.0","result":{"status":"ok"},"id":1}'
+        )
+
+        mock_pkt = MagicMock()
+        mock_pkt.haslayer.side_effect = lambda layer: layer in [Raw, IP, TCP]
+        mock_pkt.__getitem__.side_effect = lambda layer: {
+            Raw: MagicMock(load=http_response),
+            IP: MagicMock(src="127.0.0.1", dst="127.0.0.1"),
+            TCP: MagicMock(sport=8765, dport=54321)
+        }[layer]
+
+        packet_callback(mock_pkt)
+
+        # Verify the JSON-RPC body was extracted and logged
+        assert mock_log.called
+        logged_entry = mock_log.call_args[0][0]
+        assert logged_entry["message"] == '{"jsonrpc":"2.0","result":{"status":"ok"},"id":1}'
+        assert logged_entry["transport_type"] == "unknown"
+        assert logged_entry["src_port"] == 8765
+        assert logged_entry["dst_port"] == 54321
+
+    @patch('mcphawk.sniffer.log_message')
+    @patch('mcphawk.sniffer._broadcast_in_any_loop')
+    def test_http_without_jsonrpc_ignored(self, mock_broadcast, mock_log):
+        """Test that HTTP requests without JSON-RPC content are ignored."""
+        http_request = (
+            b'POST /api/test HTTP/1.1\r\n'
+            b'Host: localhost:8765\r\n'
+            b'Content-Type: application/json\r\n'
+            b'\r\n'
+            b'{"data":"not json-rpc"}'
+        )
+
+        mock_pkt = MagicMock()
+        mock_pkt.haslayer.side_effect = lambda layer: layer in [Raw, IP, TCP]
+        mock_pkt.__getitem__.side_effect = lambda layer: {
+            Raw: MagicMock(load=http_request),
+            IP: MagicMock(src="127.0.0.1", dst="127.0.0.1"),
+            TCP: MagicMock(sport=54321, dport=8765)
+        }[layer]
+
+        packet_callback(mock_pkt)
+
+        # Should not log non-JSON-RPC content
+        assert not mock_log.called
+
+
+    @patch('mcphawk.sniffer.log_message')
+    @patch('mcphawk.sniffer._broadcast_in_any_loop')
+    def test_mcphawk_mcp_traffic_metadata(self, mock_broadcast, mock_log):
+        """Test that MCPHawk's own MCP traffic is tagged with metadata."""
+        import mcphawk.sniffer
+        # Set up MCPHawk MCP ports for this test
+        mcphawk.sniffer._mcphawk_mcp_ports = {8765}
+
+        http_request = (
+            b'POST /mcp HTTP/1.1\r\n'
+            b'Host: localhost:8765\r\n'
+            b'Content-Type: application/json\r\n'
+            b'\r\n'
+            b'{"jsonrpc":"2.0","method":"test","id":1}'
+        )
+
+        mock_pkt = MagicMock()
+        # Note: haslayer should return True for IP but False for IPv6
+        mock_pkt.haslayer.side_effect = lambda layer: {
+            Raw: True,
+            IP: True,
+            TCP: True,
+            IPv6: False
+        }.get(layer, False)
+
+        mock_pkt.__getitem__.side_effect = lambda layer: {
+            Raw: MagicMock(load=http_request),
+            IP: MagicMock(src="127.0.0.1", dst="127.0.0.1"),
+            TCP: MagicMock(sport=54321, dport=8765)
+        }[layer]
+
+        packet_callback(mock_pkt)
+
+        # Verify metadata was added
+        assert mock_log.called
+        logged_entry = mock_log.call_args[0][0]
+        assert logged_entry["metadata"] == '{"source": "mcphawk-mcp"}'
+
+    def test_state_isolation_between_tests(self):
+        """Test that state is properly isolated between tests."""
+        import mcphawk.sniffer
+        # Verify state is clean at the start of the test
+        assert len(mcphawk.sniffer._mcphawk_mcp_ports) == 0
+
+        # Modify state
+        mcphawk.sniffer._mcphawk_mcp_ports.add(9999)
+
+        # State will be cleaned up by setup_method before next test
+
+    @patch('mcphawk.sniffer.log_message')
+    @patch('mcphawk.sniffer._broadcast_in_any_loop')
+    def test_http_sse_response_parsing(self, mock_broadcast, mock_log):
+        """Test parsing of Server-Sent Events (SSE) responses with JSON-RPC."""
+        import json
+
+        json_content = json.dumps({
+            "jsonrpc": "2.0",
+            "result": {
+                "tools": [
+                    {"name": "get_stats", "description": "Get traffic stats"}
+                ]
+            },
+            "id": 2
+        })
+
+        sse_response = (
+            f"HTTP/1.1 200 OK\r\n"
+            f"Content-Type: text/event-stream\r\n"
+            f"Cache-Control: no-cache\r\n"
+            f"\r\n"
+            f"data: {json_content}\n\n"
+        ).encode()
+
+        mock_pkt = MagicMock()
+        mock_pkt.haslayer.side_effect = lambda layer: layer in [Raw, IP, TCP]
+        mock_pkt.__getitem__.side_effect = lambda layer: {
+            Raw: MagicMock(load=sse_response),
+            IP: MagicMock(src="127.0.0.1", dst="127.0.0.1"),
+            TCP: MagicMock(sport=8765, dport=54321)
+        }[layer]
+
+        packet_callback(mock_pkt)
+
+        # Verify the JSON-RPC was extracted from SSE format and logged
+        assert mock_log.called
+        logged_entry = mock_log.call_args[0][0]
+        assert logged_entry["message"] == json_content
+        assert logged_entry["transport_type"] == "unknown"
+        assert logged_entry["src_port"] == 8765
+        assert logged_entry["dst_port"] == 54321

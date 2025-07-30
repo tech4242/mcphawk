@@ -1,4 +1,4 @@
-"""Test IPv4 and IPv6 traffic capture for both TCP/Direct and TCP/WS."""
+"""Test IPv4 and IPv6 traffic capture for unknown."""
 import json
 import socket
 import time
@@ -26,7 +26,7 @@ class TestIPv4Capture:
     """Test IPv4 traffic capture."""
 
     def test_ipv4_tcp_direct(self, test_db):
-        """Test IPv4 TCP/Direct traffic capture."""
+        """Test IPv4 unknown traffic capture."""
         json_rpc = json.dumps({"jsonrpc": "2.0", "method": "ipv4_tcp_test", "id": 1})
 
         # Create IPv4 packet
@@ -37,37 +37,18 @@ class TestIPv4Capture:
 
         logs = fetch_logs(limit=1)
         assert len(logs) == 1
-        assert logs[0]["traffic_type"] == "TCP/Direct"
+        assert logs[0]["transport_type"] == "unknown"
         assert logs[0]["src_ip"] == "127.0.0.1"
         assert logs[0]["dst_ip"] == "127.0.0.1"
         assert "ipv4_tcp_test" in logs[0]["message"]
 
-    def test_ipv4_tcp_ws(self, test_db):
-        """Test IPv4 TCP/WS (WebSocket) traffic capture."""
-        json_rpc = json.dumps({"jsonrpc": "2.0", "method": "ipv4_ws_test", "id": 2})
-
-        # Create WebSocket frame
-        frame = bytes([0x81, len(json_rpc)]) + json_rpc.encode()
-
-        # Create IPv4 packet
-        pkt = IP(src="127.0.0.1", dst="127.0.0.1") / TCP(sport=8765, dport=54321) / Raw(load=frame)
-        packet_callback(pkt)
-
-        time.sleep(0.1)
-
-        logs = fetch_logs(limit=1)
-        assert len(logs) == 1
-        assert logs[0]["traffic_type"] == "TCP/WS"
-        assert logs[0]["src_ip"] == "127.0.0.1"
-        assert logs[0]["dst_ip"] == "127.0.0.1"
-        assert "ipv4_ws_test" in logs[0]["message"]
 
 
 class TestIPv6Capture:
     """Test IPv6 traffic capture."""
 
     def test_ipv6_tcp_direct(self, test_db):
-        """Test IPv6 TCP/Direct traffic capture."""
+        """Test IPv6 unknown traffic capture."""
         json_rpc = json.dumps({"jsonrpc": "2.0", "method": "ipv6_tcp_test", "id": 3})
 
         # Create IPv6 packet
@@ -81,33 +62,11 @@ class TestIPv6Capture:
         if len(logs) == 0:
             pytest.skip("IPv6 traffic not captured - known limitation")
         else:
-            assert logs[0]["traffic_type"] == "TCP/Direct"
+            assert logs[0]["transport_type"] == "unknown"
             assert logs[0]["src_ip"] == "::1"
             assert logs[0]["dst_ip"] == "::1"
             assert "ipv6_tcp_test" in logs[0]["message"]
 
-    def test_ipv6_tcp_ws(self, test_db):
-        """Test IPv6 TCP/WS (WebSocket) traffic capture."""
-        json_rpc = json.dumps({"jsonrpc": "2.0", "method": "ipv6_ws_test", "id": 4})
-
-        # Create WebSocket frame
-        frame = bytes([0x81, len(json_rpc)]) + json_rpc.encode()
-
-        # Create IPv6 packet
-        pkt = IPv6(src="::1", dst="::1") / TCP(sport=8765, dport=54321) / Raw(load=frame)
-        packet_callback(pkt)
-
-        time.sleep(0.1)
-
-        logs = fetch_logs(limit=1)
-        # This test will show if IPv6 is captured
-        if len(logs) == 0:
-            pytest.skip("IPv6 traffic not captured - known limitation")
-        else:
-            assert logs[0]["traffic_type"] == "TCP/WS"
-            assert logs[0]["src_ip"] == "::1"
-            assert logs[0]["dst_ip"] == "::1"
-            assert "ipv6_ws_test" in logs[0]["message"]
 
 
 class TestRealSocketCapture:
