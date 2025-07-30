@@ -60,8 +60,9 @@ def test_mcp_command_help():
     # Check for transport option (may be formatted as --transport or -transport)
     assert "transport" in result.stdout
     assert "stdio or tcp" in result.stdout
-    # Check for mcp-port option (may be formatted as --mcp-port or -mcp-port)
-    assert "mcp-port" in result.stdout
+    # Check for mcp port option (may be formatted as --mcp-port, -mcp-port, or broken across lines)
+    assert "mcp" in result.stdout and "port" in result.stdout
+    assert "Port for TCP transport" in result.stdout
 
 
 def test_mcp_command_stdio_transport():
