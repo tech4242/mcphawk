@@ -61,7 +61,7 @@ def sample_logs(test_db):
             "dst_port": 8000,
             "direction": "unknown",
             "message": json.dumps(msg),
-            "traffic_type": "TCP/Direct"
+            "transport_type": "unknown"
         }
         logger.log_message(entry)
 
@@ -162,12 +162,12 @@ class TestMCPServer:
         # Test traffic type filter
         result = await search_tool.fn(
             search_term="jsonrpc",
-            traffic_type="TCP/Direct"
+            transport_type="unknown"
         )
         data = json.loads(result)
         # All 4 test messages match the search criteria
         assert len(data) == 4
-        assert all(log["traffic_type"] == "TCP/Direct" for log in data)
+        assert all(log["transport_type"] == "unknown" for log in data)
 
     @pytest.mark.asyncio
     async def test_error_handling(self, test_db):

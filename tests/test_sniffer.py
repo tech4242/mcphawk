@@ -205,7 +205,7 @@ class TestHTTPParsing:
         assert mock_log.called
         logged_entry = mock_log.call_args[0][0]
         assert logged_entry["message"] == '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05"},"id":1}'
-        assert logged_entry["traffic_type"] == "TCP/Direct"
+        assert logged_entry["transport_type"] == "unknown"
         assert logged_entry["src_port"] == 54321
         assert logged_entry["dst_port"] == 8765
 
@@ -235,7 +235,7 @@ class TestHTTPParsing:
         assert mock_log.called
         logged_entry = mock_log.call_args[0][0]
         assert logged_entry["message"] == '{"jsonrpc":"2.0","result":{"status":"ok"},"id":1}'
-        assert logged_entry["traffic_type"] == "TCP/Direct"
+        assert logged_entry["transport_type"] == "unknown"
         assert logged_entry["src_port"] == 8765
         assert logged_entry["dst_port"] == 54321
 
@@ -352,6 +352,6 @@ class TestHTTPParsing:
         assert mock_log.called
         logged_entry = mock_log.call_args[0][0]
         assert logged_entry["message"] == json_content
-        assert logged_entry["traffic_type"] == "TCP/Direct"
+        assert logged_entry["transport_type"] == "unknown"
         assert logged_entry["src_port"] == 8765
         assert logged_entry["dst_port"] == 54321

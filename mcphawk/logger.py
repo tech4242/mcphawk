@@ -37,19 +37,11 @@ def init_db() -> None:
             dst_port INTEGER,
             direction TEXT CHECK(direction IN ('incoming', 'outgoing', 'unknown')),
             message TEXT,
-            traffic_type TEXT,
+            transport_type TEXT,
             metadata TEXT
         )
         """
     )
-
-    # Add traffic_type and metadata columns to existing tables
-    cur.execute("PRAGMA table_info(logs)")
-    columns = [col[1] for col in cur.fetchall()]
-    if "traffic_type" not in columns:
-        cur.execute("ALTER TABLE logs ADD COLUMN traffic_type TEXT")
-    if "metadata" not in columns:
-        cur.execute("ALTER TABLE logs ADD COLUMN metadata TEXT")
     conn.commit()
     conn.close()
 
@@ -68,7 +60,7 @@ def log_message(entry: dict[str, Any]) -> None:
             dst_port (int)
             direction (str): 'incoming', 'outgoing', or 'unknown'
             message (str)
-            traffic_type (str): 'TCP', 'WS', or 'N/A' (optional, defaults to 'N/A')
+            transport_type (str): 'streamable_http', 'http_sse', 'stdio', or 'unknown' (optional, defaults to 'unknown')
             metadata (str): JSON string with additional metadata (optional)
     """
     timestamp = entry.get("timestamp", datetime.now(tz=timezone.utc))
@@ -80,7 +72,7 @@ def log_message(entry: dict[str, Any]) -> None:
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type, metadata)
+        INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
@@ -92,7 +84,7 @@ def log_message(entry: dict[str, Any]) -> None:
             entry.get("dst_port"),
             entry.get("direction", "unknown"),
             entry.get("message"),
-            entry.get("traffic_type", "N/A"),
+            entry.get("transport_type", "unknown"),
             entry.get("metadata"),
         ),
     )
@@ -124,7 +116,7 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type, metadata
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata
         FROM logs
         ORDER BY timestamp DESC
         LIMIT ?
@@ -144,7 +136,7 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
             "dst_port": row["dst_port"],
             "direction": row["direction"],
             "message": row["message"],
-            "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
+            "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
             "metadata": row["metadata"],
         }
         for row in rows
@@ -196,7 +188,7 @@ def get_log_by_id(log_id: str) -> dict[str, Any] | None:
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type, metadata
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata
         FROM logs
         WHERE log_id = ?
         """,
@@ -217,7 +209,7 @@ def get_log_by_id(log_id: str) -> dict[str, Any] | None:
         "dst_port": row["dst_port"],
         "direction": row["direction"],
         "message": row["message"],
-        "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
+        "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
         "metadata": row["metadata"],
     }
 
@@ -242,7 +234,7 @@ def fetch_logs_with_offset(limit: int = 100, offset: int = 0) -> list[dict[str, 
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, traffic_type, metadata
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata
         FROM logs
         ORDER BY log_id DESC
         LIMIT ? OFFSET ?
@@ -262,7 +254,7 @@ def fetch_logs_with_offset(limit: int = 100, offset: int = 0) -> list[dict[str, 
             "dst_port": row["dst_port"],
             "direction": row["direction"],
             "message": row["message"],
-            "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
+            "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
             "metadata": row["metadata"],
         }
         for row in rows
@@ -270,14 +262,14 @@ def fetch_logs_with_offset(limit: int = 100, offset: int = 0) -> list[dict[str, 
 
 
 def search_logs(search_term: str = "", message_type: str | None = None,
-                traffic_type: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+                transport_type: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
     """
     Search logs by various criteria.
 
     Args:
         search_term: Text to search for in messages
         message_type: Filter by JSON-RPC message type (request, response, notification)
-        traffic_type: Filter by traffic type (TCP/Direct)
+        transport_type: Filter by transport type (streamable_http, http_sse, stdio, unknown)
         limit: Maximum number of results
 
     Returns:
@@ -298,9 +290,9 @@ def search_logs(search_term: str = "", message_type: str | None = None,
         query += " AND message LIKE ?"
         params.append(f"%{search_term}%")
 
-    if traffic_type:
-        query += " AND traffic_type = ?"
-        params.append(traffic_type)
+    if transport_type:
+        query += " AND transport_type = ?"
+        params.append(transport_type)
 
     query += " ORDER BY log_id DESC LIMIT ?"
     params.append(limit)
@@ -321,7 +313,7 @@ def search_logs(search_term: str = "", message_type: str | None = None,
             "dst_port": row["dst_port"],
             "direction": row["direction"],
             "message": row["message"],
-            "traffic_type": row["traffic_type"] if row["traffic_type"] is not None else "N/A",
+            "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
             "metadata": row["metadata"],
         }
 
@@ -351,14 +343,14 @@ def get_traffic_stats() -> dict[str, Any]:
             "responses": 0,
             "notifications": 0,
             "errors": 0,
-            "by_traffic_type": {}
+            "by_transport_type": {}
         }
 
     conn = sqlite3.connect(current_path)
     cur = conn.cursor()
 
     # Get all messages for analysis
-    cur.execute("SELECT message, traffic_type FROM logs")
+    cur.execute("SELECT message, transport_type FROM logs")
     logs = cur.fetchall()
 
     stats = {
@@ -367,12 +359,12 @@ def get_traffic_stats() -> dict[str, Any]:
         "responses": 0,
         "notifications": 0,
         "errors": 0,
-        "by_traffic_type": {}
+        "by_transport_type": {}
     }
 
     from .utils import get_message_type
 
-    for message, traffic_type in logs:
+    for message, transport_type in logs:
         # Count by message type
         msg_type = get_message_type(message)
         if msg_type == "request":
@@ -391,9 +383,9 @@ def get_traffic_stats() -> dict[str, Any]:
         except Exception:
             pass
 
-        # Count by traffic type
-        if traffic_type:
-            stats["by_traffic_type"][traffic_type] = stats["by_traffic_type"].get(traffic_type, 0) + 1
+        # Count by transport type
+        if transport_type:
+            stats["by_transport_type"][transport_type] = stats["by_transport_type"].get(transport_type, 0) + 1
 
     conn.close()
     return stats

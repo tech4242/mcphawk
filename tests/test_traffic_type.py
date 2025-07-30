@@ -1,4 +1,4 @@
-"""Test traffic_type field is properly set for TCP traffic."""
+"""Test transport_type field is properly set for TCP traffic."""
 import json
 import uuid
 from datetime import datetime, timezone
@@ -11,15 +11,15 @@ from mcphawk.logger import clear_logs, fetch_logs, init_db, log_message, set_db_
 @pytest.fixture
 def test_db(tmp_path):
     """Create a test database."""
-    db_path = tmp_path / "test_traffic_type.db"
+    db_path = tmp_path / "test_transport_type.db"
     set_db_path(str(db_path))
     init_db()
     yield db_path
     clear_logs()
 
 
-def test_tcp_traffic_type(test_db):
-    """Test that TCP traffic is marked with traffic_type='TCP'."""
+def test_tcp_transport_type(test_db):
+    """Test that TCP traffic is marked with transport_type='TCP'."""
     entry = {
         "log_id": str(uuid.uuid4()),
         "timestamp": datetime.now(tz=timezone.utc),
@@ -29,19 +29,19 @@ def test_tcp_traffic_type(test_db):
         "dst_port": 54321,
         "direction": "outgoing",
         "message": json.dumps({"jsonrpc": "2.0", "method": "test", "id": 1}),
-        "traffic_type": "TCP/Direct",
+        "transport_type": "unknown",
     }
 
     log_message(entry)
 
     logs = fetch_logs(limit=1)
     assert len(logs) == 1
-    assert logs[0]["traffic_type"] == "TCP/Direct"
+    assert logs[0]["transport_type"] == "unknown"
 
 
 
-def test_unknown_traffic_type(test_db):
-    """Test that unknown traffic is marked with traffic_type='N/A'."""
+def test_unknown_transport_type(test_db):
+    """Test that unknown traffic is marked with transport_type='N/A'."""
     entry = {
         "log_id": str(uuid.uuid4()),
         "timestamp": datetime.now(tz=timezone.utc),
@@ -51,22 +51,22 @@ def test_unknown_traffic_type(test_db):
         "dst_port": 54321,
         "direction": "outgoing",
         "message": json.dumps({"jsonrpc": "2.0", "method": "test", "id": 1}),
-        # Omit traffic_type to test default
+        # Omit transport_type to test default
     }
 
     log_message(entry)
 
     logs = fetch_logs(limit=1)
     assert len(logs) == 1
-    assert logs[0]["traffic_type"] == "N/A"
+    assert logs[0]["transport_type"] == "unknown"
 
 
-def test_legacy_entries_without_traffic_type(test_db):
-    """Test that we can handle legacy entries without traffic_type column."""
+def test_legacy_entries_without_transport_type(test_db):
+    """Test that we can handle legacy entries without transport_type column."""
     # This tests the backward compatibility in fetch_logs
     import sqlite3
 
-    # Insert a row without traffic_type using direct SQL
+    # Insert a row without transport_type using direct SQL
     conn = sqlite3.connect(str(test_db))
     cur = conn.cursor()
     cur.execute(
@@ -90,5 +90,5 @@ def test_legacy_entries_without_traffic_type(test_db):
 
     logs = fetch_logs(limit=1)
     assert len(logs) == 1
-    # Should get 'N/A' for entries without traffic_type
-    assert logs[0]["traffic_type"] == "N/A"
+    # Should get 'N/A' for entries without transport_type
+    assert logs[0]["transport_type"] == "unknown"

@@ -57,7 +57,7 @@ def get_logs(limit: int = 50):
         {
             **log,
             "timestamp": log["timestamp"].isoformat(),  # ensure JSON-friendly
-            "traffic_type": log.get("traffic_type", "N/A")  # ensure traffic_type is included
+            "transport_type": log.get("transport_type", "unknown")  # ensure transport_type is included
         }
         for log in logs
     ])

@@ -60,7 +60,7 @@ class MCPHawkServer:
         async def search_traffic(
             search_term: str = "",
             message_type: Optional[str] = None,
-            traffic_type: Optional[str] = None,
+            transport_type: Optional[str] = None,
             limit: int = 100
         ) -> str:
             """Search traffic by message content or type.
@@ -68,13 +68,13 @@ class MCPHawkServer:
             Args:
                 search_term: Term to search for in message content
                 message_type: Filter by message type (request, response, notification)
-                traffic_type: Filter by traffic type (TCP/Direct)
+                transport_type: Filter by transport type (streamable_http/http_sse/stdio/unknown)
                 limit: Maximum number of results
             """
             logs = mcphawk_logger.search_logs(
                 search_term=search_term,
                 message_type=message_type,
-                traffic_type=traffic_type,
+                transport_type=transport_type,
                 limit=limit
             )
 

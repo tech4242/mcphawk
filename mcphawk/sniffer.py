@@ -80,6 +80,10 @@ def packet_callback(pkt):
 
             ts = datetime.now(tz=timezone.utc)
             log_id = str(uuid.uuid4())
+
+            # Use transport type from TCP reassembler
+            transport = msg_info.get("transport", "unknown")
+
             entry = {
                 "log_id": log_id,
                 "timestamp": ts,
@@ -89,7 +93,7 @@ def packet_callback(pkt):
                 "dst_port": msg_info["dst_port"],
                 "direction": "unknown",
                 "message": msg_info["message"],
-                "traffic_type": "TCP/Direct",
+                "transport_type": transport,
             }
 
             # Add metadata if this is MCPHawk's own MCP traffic
@@ -105,7 +109,13 @@ def packet_callback(pkt):
 
             # In auto-detect mode, log when we find MCP traffic
             if _auto_detect_mode:
-                print(f"[MCPHawk] Detected {msg_info['type']} MCP traffic on port {msg_info['src_port']} -> {msg_info['dst_port']}")
+                transport_name = {
+                    "streamable_http": "Streamable HTTP",
+                    "http_sse": "HTTP+SSE",
+                    "stdio": "stdio",
+                    "unknown": "Unknown"
+                }.get(transport, "Unknown")
+                print(f"[MCPHawk] Detected {transport_name} MCP traffic on port {msg_info['src_port']} -> {msg_info['dst_port']}")
 
     if pkt.haslayer(Raw):
         raw_payload = pkt[Raw].load
@@ -183,6 +193,15 @@ def packet_callback(pkt):
                     dst_ip = ""
 
                 log_id = str(uuid.uuid4())
+
+                # Check if we know the transport type for this connection
+                transport = _tcp_reassembler.transport_tracker.get_transport(
+                    src_ip, src_port, dst_ip, dst_port
+                ).value
+
+                if _auto_detect_mode and transport != "unknown":
+                    logger.debug(f"Auto-detect: Found transport {transport} for {src_ip}:{src_port} -> {dst_ip}:{dst_port}")
+
                 entry = {
                     "log_id": log_id,
                     "timestamp": ts,
@@ -192,7 +211,7 @@ def packet_callback(pkt):
                     "dst_port": dst_port,
                     "direction": "unknown",
                     "message": decoded,
-                    "traffic_type": "TCP/Direct",
+                    "transport_type": transport,
                 }
 
                 # Add metadata if this is MCPHawk's own MCP traffic

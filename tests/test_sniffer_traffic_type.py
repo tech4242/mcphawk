@@ -1,4 +1,4 @@
-"""Test that sniffer properly sets traffic_type for captured packets."""
+"""Test that sniffer properly sets transport_type for captured packets."""
 import json
 import time
 
@@ -13,15 +13,15 @@ from mcphawk.sniffer import packet_callback
 @pytest.fixture
 def test_db(tmp_path):
     """Create a test database."""
-    db_path = tmp_path / "test_sniffer_traffic_type.db"
+    db_path = tmp_path / "test_sniffer_transport_type.db"
     set_db_path(str(db_path))
     init_db()
     yield db_path
     clear_logs()
 
 
-def test_sniffer_tcp_traffic_type(test_db):
-    """Test that sniffer marks TCP JSON-RPC traffic with traffic_type='TCP'."""
+def test_sniffer_tcp_transport_type(test_db):
+    """Test that sniffer marks TCP JSON-RPC traffic with transport_type='TCP'."""
     # Create a mock TCP packet with JSON-RPC content
     json_rpc = json.dumps({"jsonrpc": "2.0", "method": "test", "id": 1})
 
@@ -42,7 +42,7 @@ def test_sniffer_tcp_traffic_type(test_db):
     # Check the logged entry
     logs = fetch_logs(limit=1)
     assert len(logs) == 1
-    assert logs[0]["traffic_type"] == "TCP/Direct"
+    assert logs[0]["transport_type"] == "unknown"
     assert logs[0]["src_port"] == 12345
     assert logs[0]["dst_port"] == 54321
 

@@ -48,7 +48,7 @@ class TestMCPStdioIntegration:
                 "dst_port": 8000,
                 "direction": "unknown",
                 "message": json.dumps(msg),
-                "traffic_type": "TCP/Direct"
+                "transport_type": "unknown"
             }
             logger.log_message(entry)
 

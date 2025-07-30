@@ -1,4 +1,4 @@
-"""Test IPv4 and IPv6 traffic capture for TCP/Direct."""
+"""Test IPv4 and IPv6 traffic capture for unknown."""
 import json
 import socket
 import time
@@ -26,7 +26,7 @@ class TestIPv4Capture:
     """Test IPv4 traffic capture."""
 
     def test_ipv4_tcp_direct(self, test_db):
-        """Test IPv4 TCP/Direct traffic capture."""
+        """Test IPv4 unknown traffic capture."""
         json_rpc = json.dumps({"jsonrpc": "2.0", "method": "ipv4_tcp_test", "id": 1})
 
         # Create IPv4 packet
@@ -37,7 +37,7 @@ class TestIPv4Capture:
 
         logs = fetch_logs(limit=1)
         assert len(logs) == 1
-        assert logs[0]["traffic_type"] == "TCP/Direct"
+        assert logs[0]["transport_type"] == "unknown"
         assert logs[0]["src_ip"] == "127.0.0.1"
         assert logs[0]["dst_ip"] == "127.0.0.1"
         assert "ipv4_tcp_test" in logs[0]["message"]
@@ -48,7 +48,7 @@ class TestIPv6Capture:
     """Test IPv6 traffic capture."""
 
     def test_ipv6_tcp_direct(self, test_db):
-        """Test IPv6 TCP/Direct traffic capture."""
+        """Test IPv6 unknown traffic capture."""
         json_rpc = json.dumps({"jsonrpc": "2.0", "method": "ipv6_tcp_test", "id": 3})
 
         # Create IPv6 packet
@@ -62,7 +62,7 @@ class TestIPv6Capture:
         if len(logs) == 0:
             pytest.skip("IPv6 traffic not captured - known limitation")
         else:
-            assert logs[0]["traffic_type"] == "TCP/Direct"
+            assert logs[0]["transport_type"] == "unknown"
             assert logs[0]["src_ip"] == "::1"
             assert logs[0]["dst_ip"] == "::1"
             assert "ipv6_tcp_test" in logs[0]["message"]

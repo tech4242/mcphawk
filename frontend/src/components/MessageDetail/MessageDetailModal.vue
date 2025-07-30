@@ -48,9 +48,12 @@
                     </span>
                   </div>
                   <div>
-                    <span class="text-gray-500 dark:text-gray-400">Traffic:</span>
-                    <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
-                      {{ logStore.selectedLog.traffic_type || 'N/A' }}
+                    <span class="text-gray-500 dark:text-gray-400">Transport:</span>
+                    <span 
+                      class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                      :class="transportTypeColor"
+                    >
+                      {{ formattedTransportType }}
                     </span>
                   </div>
                   <div>
@@ -123,6 +126,7 @@ import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } fro
 import { ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
 import { useLogStore } from '@/stores/logs'
 import { getMessageType, parseMessage } from '@/utils/messageParser'
+import { formatTransportType, getTransportTypeColor } from '@/utils/transportFormatter'
 import MessageTypeBadge from '@/components/LogTable/MessageTypeBadge.vue'
 import PairedMessages from '@/components/common/PairedMessages.vue'
 
@@ -148,6 +152,16 @@ const isMcpHawkTraffic = computed(() => {
   } catch {
     return false
   }
+})
+
+const formattedTransportType = computed(() => {
+  if (!logStore.selectedLog) return 'Unknown'
+  return formatTransportType(logStore.selectedLog.transport_type || logStore.selectedLog.traffic_type || 'unknown')
+})
+
+const transportTypeColor = computed(() => {
+  if (!logStore.selectedLog) return ''
+  return getTransportTypeColor(logStore.selectedLog.transport_type || logStore.selectedLog.traffic_type || 'unknown')
 })
 
 async function copyToClipboard() {

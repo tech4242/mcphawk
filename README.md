@@ -11,42 +11,67 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
-MCPHawk is a passive sniffer for **Model Context Protocol (MCP)** traffic, similar to Wireshark but MCP-focused. It's Wireshark x mcpinspector.
+MCPHawk is a passive network analyzer for **Model Context Protocol (MCP)** traffic, providing deep visibility into MCP client-server interactions. Think Wireshark meets mcpinspector, purpose-built for the MCP ecosystem.
 
-- It captures JSON-RPC traffic between MCP clients and WebSocket/TCP-based MCP servers (IPv4 and IPv6) e.g. from any tool, agent, or LLM
-- MCPHawk can reconstruct full JSON-RPC messages from raw TCP traffic without requiring a handshake. 
-- It captures traffic "on the wire" between any MCP client and server—does not require client/server modification.
+**Key Capabilities:**
+- **Protocol-Aware Capture**: Understands MCP's JSON-RPC 2.0 transport layer, capturing and reassembling messages from raw TCP streams
+- **Transport Agnostic**: Monitors MCP traffic across all standard transports
+- **Zero-Configuration Monitoring**: Passively observes MCP communication without proxies, certificates, or modifications to clients/servers
+- **Full Message Reconstruction**: Advanced TCP stream reassembly handles fragmented packets, chunked HTTP transfers, and SSE streams
 
 <img src="examples/branding/mcphawk_screenshot.png" alt="MCPHawk Screenshot" width="100%">
 
-## Features
+## Core Features
 
-Non-exhaustive list:
-- **Proper JSON-RPC 2.0 message type detection**:
-  - Requests (method + id)
-  - Responses (result/error + id)
-  - Notifications (method without id)
-  - Error responses
-- **Auto-detect mode** - automatically discovers MCP traffic on any port without prior configuration
-- **Flexible traffic filtering**:
-  - Monitor specific ports with `--port`
-  - Use custom BPF filters with `--filter`
-  - Auto-detect MCP traffic on all ports with `--auto-detect`
-- **Chronological message display** - messages shown in order as captured
-- **Message filtering** - view all, requests only, responses only, or notifications only
-- **Optional ID-based pairing visualization** - see which requests and responses belong together
-- **Real-time statistics** - message counts by type
-- **Console-only mode** - use `mcphawk sniff` for terminal output without web UI
-- **Historical log viewing** - use `mcphawk web --no-sniffer` to view past captures without active sniffing
-- **Chill UX** 
-  - dark mode 🌝
-  - expand mode to directly see JSON withtout detailed view
-  - filtering 
-  - always see if WS connection is up for live updates
-- **MCP Server for querying captured data** - Query captured traffic via MCP protocol
-  - Standalone mode or integrated with sniffer/web commands
-  - Streamable HTTP transport for easy integration and testing
-  - Tools for traffic search, statistics, and analysis
+### 🔍 MCP Protocol Analysis
+- **Complete JSON-RPC 2.0 Support**: Correctly identifies and categorizes all MCP message types
+  - **Requests**: Method calls with unique IDs for correlation
+  - **Responses**: Success results and error responses with matching IDs  
+  - **Notifications**: Fire-and-forget method calls without IDs
+  - **Batch Operations**: Support for JSON-RPC batch requests/responses
+- **Transport-Specific Handling**:
+  - **HTTP/SSE**: Full support for MCP's streaming HTTP transport with Server-Sent Events
+  - **TCP Direct**: Raw TCP stream reconstruction for custom implementations
+  - **Chunked Transfer**: Handles HTTP chunked transfer encoding transparently
+- **Protocol Compliance**: Validates JSON-RPC 2.0 structure and MCP-specific extensions
+
+### 🚀 Advanced Capture Capabilities
+- **Auto-Discovery Mode**: Intelligently detects MCP traffic on any port using pattern matching
+- **TCP Stream Reassembly**: Reconstructs complete messages from fragmented packets
+- **Multi-Stream Tracking**: Simultaneously monitors multiple MCP client-server connections
+- **IPv4/IPv6 Dual Stack**: Native support for both IP protocols
+- **Zero-Copy Architecture**: Efficient packet processing without client/server overhead
+
+### 📊 Analysis & Visualization
+- **Real-Time Web Dashboard**: Live traffic visualization with WebSocket updates
+- **Message Flow Visualization**: Track request-response pairs using JSON-RPC IDs
+- **Traffic Statistics**: Method frequency, error rates, response times
+- **Search & Filter**: Query by method name, message type, content patterns
+- **Export Capabilities**: Save captured sessions for offline analysis
+
+### 🛠️ Developer Experience
+- **MCP Server Integration**: Query captured data using MCP protocol itself
+  - FastMCP-based implementation for maximum compatibility
+  - Available tools: `query_traffic`, `search_traffic`, `get_stats`, `list_methods`
+  - Supports both stdio and HTTP transports
+- **Multiple Interfaces**:
+  - Web UI for interactive exploration
+  - CLI for scripting and automation  
+  - MCP server for programmatic access
+- **Flexible Deployment**:
+  - Standalone sniffer mode
+  - Integrated web + sniffer
+  - Historical log analysis without active capture
+
+### MCP Transport Support
+
+| Official MCP Transport | Protocol Version | Capture Support | Details |
+|------------------------|------------------|:---------------:|---------|
+| **stdio** | All versions | coming soon :) | secret |
+| **HTTP** (Streamable HTTP) | 2025-03-26+ | ✅ Full | HTTP POST with optional SSE streaming responses |
+| **HTTP+SSE** (deprecated) | 2024-11-05 | ✅ Full | Legacy transport with separate SSE endpoint |
+
+Disclaimer: TCP direct traffic with JSON-RPC is also captured and marked as unknown (should you have custom stuff you shouldn't)
 
 ## Comparison with Similar Tools
 
@@ -54,23 +79,20 @@ Non-exhaustive list:
 |-----------------------------------------------|:---------:|:------------:|:---------:|
 | Passive sniffing (no proxy needed)            |     ✅     |      ❌       |     ✅     |
 | MCP/JSON-RPC protocol awareness               |     ✅     |      ✅       |     ❌     |
-| Auto-detect MCP traffic on any port           |     ✅     |      ❌       |     ❌     |
+| SSE/Chunked HTTP support                      |     ✅     |      ❓       |     ❌     |
+| TCP stream reassembly                         |     ✅     |      ❌       |     ✅     |
+| Auto-detect MCP traffic                       |     ✅     |      ❌       |     ❌     |
 | Web UI for live/historical traffic            |     ✅     |      ✅       |     ❌     |
-| Can capture any traffic (not just via proxy)  |     ✅     |      ❌       |     ✅     |
 | JSON-RPC message type detection               |     ✅     |      ❌       |     ❌     |
-| Message filtering by type                     |     ✅     |      ❌       |     ❌     |
-| Console-only mode (no web UI needed)          |     ✅     |      ❌       |     ✅     |
-| Manual request crafting/testing               |     ❌     |      ✅       |     ❌     |
-| Interactive tool/prompt testing               |     ❌     |      ✅       |     ❌     |
-| Proxy/bridge between client/server            |     ❌     |      ✅       |     ❌     |
-| No client/server config changes required      |     ✅     |      ❌       |     ✅     |
-| General protocol analysis                     |     ❌     |      ❌       |     ✅     |
-| MCP-specific features                         |     ✅     |      ✅       |     ❌     |
+| MCP server for data access                    |     ✅     |      ❌       |     ❌     |
+| No client/server config needed                |     ✅     |      ❌       |     ✅     |
+| Interactive testing/debugging                 |     ❌     |      ✅       |     ❌     |
+| Proxy/MITM capabilities                       |     ❌     |      ✅       |     ❌     |
 
 **When to use each tool:**
-- **MCPHawk**: Best for passively monitoring MCP traffic, debugging live connections, understanding protocol flow
-- **mcpinspector**: Best for actively testing MCP servers, crafting custom requests, interactive debugging
-- **Wireshark**: Best for general network analysis, non-MCP protocols, deep packet inspection
+- **MCPHawk**: Passive monitoring, protocol analysis, debugging MCP implementations, understanding traffic patterns
+- **mcpinspector**: Active testing, crafting requests, interactive debugging with proxy
+- **Wireshark**: General network analysis, non-MCP protocols, packet-level inspection
 
 ## TLS/HTTPS Limitations
 
@@ -84,11 +106,6 @@ MCPHawk captures **unencrypted** MCP traffic only. It cannot decrypt:
 - 🔍 **Understanding MCP protocol** - See actual JSON-RPC message flow
 - 🐛 **Troubleshooting local tools** - Monitor Claude Desktop, Cline, etc. with YOUR local MCP servers
 - 📊 **Development/staging environments** - Where TLS is often disabled
-
-**Not suitable for:**
-- Production traffic analysis (usually encrypted)
-- Cloud MCP services (HTTPS/WSS)
-- Third-party MCP servers with TLS 
 
 ## Installation
 
@@ -159,47 +176,51 @@ sudo mcphawk sniff --port 3000 --with-mcp --mcp-transport http
 sudo mcphawk web --port 3000 --with-mcp --mcp-transport http --mcp-port 8765
 ```
 
-## MCP Server for Querying Captured Data
+## MCP Server Integration
 
-MCPHawk includes an MCP server that allows you to query captured traffic using the Model Context Protocol. This is perfect for:
-- Building AI agents that analyze captured traffic
-- Integrating traffic analysis into your MCP-enabled tools
-- Programmatically searching and filtering captured data
+MCPHawk includes a built-in MCP server, allowing you to query captured traffic through the Model Context Protocol itself. This creates powerful possibilities:
+
+- **AI-Powered Analysis**: Connect Claude or other LLMs to analyze traffic patterns
+- **Automated Monitoring**: Build agents that detect anomalies or specific behaviors
+- **Integration Testing**: Programmatically verify MCP interactions in CI/CD pipelines
 
 <img src="examples/branding/mcphawk_claudedesktop.png" alt="MCPHawk Claude Desktop MCP" width="100%">
 
-### Available MCP Tools
+### Available Tools
 
-- **query_traffic** - Fetch logs with pagination (limit/offset)
-- **get_log** - Retrieve specific log entry by ID
-- **search_traffic** - Search by content, message type, or traffic type
-- **get_stats** - Get traffic statistics (requests, responses, errors, etc.)
-- **list_methods** - List all unique JSON-RPC methods seen
+The MCP server exposes these tools for traffic analysis:
 
-### Using with Streamable HTTP Transport
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `query_traffic` | Fetch captured logs with pagination | `limit`, `offset` |
+| `get_log` | Retrieve specific log entry | `log_id` |
+| `search_traffic` | Search logs by content or type | `search_term`, `message_type`, `traffic_type`, `limit` |
+| `get_stats` | Get traffic statistics | None |
+| `list_methods` | List unique JSON-RPC methods | None |
 
-The HTTP transport makes it easy to test and integrate:
+### Transport Options
+
+#### HTTP Transport (Development & Testing)
+
+The HTTP transport uses Server-Sent Events (SSE) for streaming responses:
 
 ```bash
-# Start MCP server on HTTP
+# Start MCP server
 mcphawk mcp --transport http --mcp-port 8765
 
-# Initialize session
-curl -X POST http://localhost:8765/mcp \
-  -H 'Content-Type: application/json' \
-  -H 'X-Session-Id: my-session' \
-  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0"}},"id":1}'
+# Initialize session (note: returns SSE stream)
+curl -N -X POST http://localhost:8765/mcp \
+  -H 'Accept: text/event-stream' \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
 
-# Query traffic statistics
-curl -X POST http://localhost:8765/mcp \
-  -H 'Content-Type: application/json' \
-  -H 'X-Session-Id: my-session' \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"get_stats","arguments":{}},"id":2}'
+# Example response (SSE format):
+# event: message
+# data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05",...}}
 ```
 
-### Using with stdio Transport (Claude Desktop)
+#### stdio Transport (Production & Claude Desktop)
 
-Configure in Claude Desktop settings:
+For Claude Desktop integration:
 
 ```json
 {
@@ -212,7 +233,13 @@ Configure in Claude Desktop settings:
 }
 ```
 
-See [examples/stdio_client.py](examples/stdio_client.py) for a complete working example of stdio communication.
+The stdio transport follows the standard MCP communication pattern:
+1. Client sends `initialize` request
+2. Server responds with capabilities
+3. Client sends `initialized` notification
+4. Normal tool calls can proceed
+
+See [examples/mcp_sdk_client.py](examples/mcp_sdk_client.py) for HTTP client example or [examples/stdio_client.py](examples/stdio_client.py) for stdio communication.
 
 ## Platform Support
 
@@ -225,7 +252,7 @@ See [examples/stdio_client.py](examples/stdio_client.py) for a complete working 
 
 - Requires elevated privileges (`sudo`) on macOS/Linux for packet capture
 - Limited to localhost/loopback interface monitoring
-- WebSocket capture requires traffic to be uncompressed
+- Cannot decrypt TLS/HTTPS traffic (WSS, HTTPS)
 - IPv6 support requires explicit interface configuration on some systems
 - High traffic volumes (>1000 msgs/sec) may impact performance
 
@@ -241,12 +268,13 @@ sudo mcphawk web --auto-detect
 - Ensure the MCP server/client is using localhost (127.0.0.1 or ::1)
 - Check if traffic is on the expected port
 - Try auto-detect mode to find MCP traffic: `--auto-detect`
-- On macOS, ensure you're allowing the terminal to capture packets in System Preferences
+- Verify traffic is unencrypted (not HTTPS/TLS)
+- On macOS, ensure Terminal has permission to capture packets in System Preferences
 
-**WebSocket Traffic Not Showing:**
-- Verify the WebSocket connection is uncompressed
-- Check if the server is using IPv6 (::1) - MCPHawk supports both IPv4 and IPv6
-- Ensure the WebSocket frames contain valid JSON-RPC messages
+**SSE/HTTP Responses Not Showing:**
+- Confirm the server uses standard SSE format (event: message\ndata: {...}\n\n)
+- Check if responses use chunked transfer encoding
+- Enable debug mode to see detailed packet analysis: `--debug`
 
 ## Potential Upcoming Features
 
@@ -307,11 +335,4 @@ mcphawk web --port 3000
 # Option 3: Watch mode
 cd frontend && npm run build:watch  # Auto-rebuild on changes
 mcphawk web --port 3000           # In another terminal
-```
-
-### Testing with Dummy Server
-
-```bash
-# Generate various MCP patterns
-python3 examples/generate_traffic/generate_all.py
 ```

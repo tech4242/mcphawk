@@ -5,6 +5,13 @@ from typing import Optional
 
 from scapy.all import IP, TCP, IPv6, Raw
 
+from .transport_detector import (
+    MCPTransport,
+    TransportTracker,
+    detect_transport_from_http,
+    extract_endpoint_from_sse,
+)
+
 logger = logging.getLogger(__name__)
 # Ensure we're using the same log level as the parent
 logger.setLevel(logging.DEBUG)
@@ -41,12 +48,48 @@ class HTTPStream:
         self.is_chunked: bool = False
         self.is_sse: bool = False
         self.buffer: bytes = b""
+        self.request_method: Optional[str] = None
+        self.request_path: Optional[str] = None
+        self.request_headers: dict[str, str] = {}
+        self.detected_transport: MCPTransport = MCPTransport.UNKNOWN
 
     def add_request(self, data: bytes):
-        """Add HTTP request data."""
+        """Add HTTP request data and parse headers."""
         self.pending_request = data
         self.buffer = b""
         logger.debug(f"New HTTP request: {data[:100]}")
+
+        # Parse request line and headers
+        try:
+            request_str = data.decode('utf-8', errors='ignore')
+            lines = request_str.split('\r\n')
+            if lines:
+                # Parse request line
+                parts = lines[0].split(' ')
+                if len(parts) >= 2:
+                    self.request_method = parts[0]
+                    self.request_path = parts[1]
+
+                # Parse headers
+                self.request_headers = {}
+                for line in lines[1:]:
+                    if ': ' in line:
+                        key, value = line.split(': ', 1)
+                        self.request_headers[key.lower()] = value
+                    elif line == '':
+                        break  # End of headers
+
+                # Try to detect transport type from request alone
+                if self.request_method and self.request_path:
+                    self.detected_transport = detect_transport_from_http(
+                        self.request_method,
+                        self.request_path,
+                        self.request_headers,
+                        False  # No response yet
+                    )
+                    logger.debug(f"Transport detected from request: {self.detected_transport}")
+        except Exception as e:
+            logger.debug(f"Error parsing request: {e}")
 
     def add_response_data(self, data: bytes):
         """Add HTTP response data, handling headers and body."""
@@ -80,6 +123,15 @@ class HTTPStream:
                 self.content_length = int(self.response_headers['content-length'])
 
             logger.debug(f"Response headers parsed: SSE={self.is_sse}, chunked={self.is_chunked}")
+
+            # Try to detect transport type
+            if self.request_method and self.request_path:
+                self.detected_transport = detect_transport_from_http(
+                    self.request_method,
+                    self.request_path,
+                    self.request_headers,
+                    self.is_sse
+                )
 
     def extract_sse_messages(self) -> list[str]:
         """Extract complete SSE messages from buffer."""
@@ -120,6 +172,13 @@ class HTTPStream:
             msg_data = data_to_process[:msg_end].decode('utf-8', errors='ignore')
             data_to_process = data_to_process[msg_end:]
             logger.debug(f"Found SSE message block: {msg_data[:100]!r}")
+
+            # Check for endpoint event (HTTP+SSE transport)
+            if "event: endpoint" in msg_data:
+                endpoint_url = extract_endpoint_from_sse(msg_data)
+                if endpoint_url:
+                    logger.debug(f"Found endpoint event, URL: {endpoint_url}")
+                    self.detected_transport = MCPTransport.HTTP_SSE
 
             # Extract data lines
             for line in msg_data.split('\n'):
@@ -187,6 +246,7 @@ class TCPStreamReassembler:
 
     def __init__(self):
         self.streams: dict[StreamKey, HTTPStream] = {}
+        self.transport_tracker = TransportTracker()
 
     def process_packet(self, pkt) -> list[dict]:
         """Process a packet and return any complete messages."""
@@ -236,6 +296,22 @@ class TCPStreamReassembler:
         if payload.startswith(b"POST ") or payload.startswith(b"GET "):
             stream.add_request(payload)
             logger.debug(f"TCP reassembly: HTTP request on {src_port}->{dst_port}")
+            logger.debug(f"TCP reassembly: Request method: {stream.request_method}, path: {stream.request_path}")
+            logger.debug(f"TCP reassembly: Request headers: {stream.request_headers}")
+
+            # If we detected transport from request, update tracker
+            if stream.detected_transport != MCPTransport.UNKNOWN:
+                self.transport_tracker.update_transport(
+                    src_ip, src_port, dst_ip, dst_port,
+                    stream.detected_transport
+                )
+                logger.debug(f"TCP reassembly: Updated transport tracker with {stream.detected_transport} from request")
+
+                # For HTTP+SSE, log detection in auto-detect mode
+                if stream.detected_transport == MCPTransport.HTTP_SSE:
+                    logger.info(f"[MCPHawk] Detected HTTP+SSE transport on {src_ip}:{src_port} -> {dst_ip}:{dst_port} (GET {stream.request_path} with Accept: text/event-stream)")
+            else:
+                logger.debug("TCP reassembly: Transport still unknown after request parsing")
 
         # Check if this is an HTTP response
         elif payload.startswith(b"HTTP/1."):
@@ -248,13 +324,21 @@ class TCPStreamReassembler:
                 sse_messages = stream.extract_sse_messages()
                 logger.debug(f"TCP reassembly: Extracted {len(sse_messages)} SSE messages")
                 for msg in sse_messages:
+                    # Update transport tracker if detected
+                    if stream.detected_transport != MCPTransport.UNKNOWN:
+                        self.transport_tracker.update_transport(
+                            src_ip, src_port, dst_ip, dst_port,
+                            stream.detected_transport
+                        )
+
                     messages.append({
                         "src_ip": src_ip,
                         "src_port": src_port,
                         "dst_ip": dst_ip,
                         "dst_port": dst_port,
                         "message": msg,
-                        "type": "sse_response"
+                        "type": "sse_response",
+                        "transport": stream.detected_transport.value
                     })
 
         # Check for standalone SSE data (no HTTP headers)
@@ -264,13 +348,16 @@ class TCPStreamReassembler:
             stream.buffer = payload
             sse_messages = stream.extract_sse_messages()
             for msg in sse_messages:
+                # Get transport from tracker
+                transport = self.transport_tracker.get_transport(src_ip, src_port, dst_ip, dst_port)
                 messages.append({
                     "src_ip": src_ip,
                     "src_port": src_port,
                     "dst_ip": dst_ip,
                     "dst_port": dst_port,
                     "message": msg,
-                    "type": "sse_data"
+                    "type": "sse_data",
+                    "transport": transport.value
                 })
 
         # For any packet, if we have an SSE stream, try to process it
@@ -282,13 +369,21 @@ class TCPStreamReassembler:
             if sse_messages:
                 logger.debug(f"TCP reassembly: Found {len(sse_messages)} messages in SSE stream")
             for msg in sse_messages:
+                # Update transport tracker if detected
+                if stream.detected_transport != MCPTransport.UNKNOWN:
+                    self.transport_tracker.update_transport(
+                        src_ip, src_port, dst_ip, dst_port,
+                        stream.detected_transport
+                    )
+
                 messages.append({
                     "src_ip": src_ip,
                     "src_port": src_port,
                     "dst_ip": dst_ip,
                     "dst_port": dst_port,
                     "message": msg,
-                    "type": "sse_continuation"
+                    "type": "sse_continuation",
+                    "transport": stream.detected_transport.value
                 })
 
         # Catch-all: Handle any data on a stream where we've seen headers
