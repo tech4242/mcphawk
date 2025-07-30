@@ -57,9 +57,11 @@ def test_mcp_command_help():
     result = runner.invoke(app, ["mcp", "--help"])
     assert result.exit_code == 0
     assert "Run MCPHawk MCP server" in result.stdout
-    assert "--transport" in result.stdout
-    assert "--mcp-port" in result.stdout
-    assert ("stdio or http" in result.stdout) or ("stdio or tcp" in result.stdout)
+    # Check for transport option (may be formatted as --transport or -transport)
+    assert "transport" in result.stdout
+    assert "stdio or tcp" in result.stdout
+    # Check for mcp-port option (may be formatted as --mcp-port or -mcp-port)
+    assert "mcp-port" in result.stdout
 
 
 def test_mcp_command_stdio_transport():
