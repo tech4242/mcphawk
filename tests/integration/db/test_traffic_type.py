@@ -5,7 +5,14 @@ from datetime import datetime, timezone
 
 import pytest
 
-from mcphawk.logger import clear_logs, fetch_logs, init_db, log_message, set_db_path
+from mcphawk.logger import (
+    clear_logs,
+    fetch_logs,
+    get_db_connection,
+    init_db,
+    log_message,
+    set_db_path,
+)
 
 
 @pytest.fixture
@@ -64,29 +71,27 @@ def test_unknown_transport_type(test_db):
 def test_legacy_entries_without_transport_type(test_db):
     """Test that we can handle legacy entries without transport_type column."""
     # This tests the backward compatibility in fetch_logs
-    import sqlite3
 
     # Insert a row without transport_type using direct SQL
-    conn = sqlite3.connect(str(test_db))
-    cur = conn.cursor()
-    cur.execute(
-        """
-        INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            str(uuid.uuid4()),
-            datetime.now(tz=timezone.utc).isoformat(),
-            "127.0.0.1",
-            "127.0.0.1",
-            12345,
-            54321,
-            "outgoing",
-            json.dumps({"jsonrpc": "2.0", "method": "test", "id": 1}),
-        ),
-    )
-    conn.commit()
-    conn.close()
+    with get_db_connection(test_db) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                datetime.now(tz=timezone.utc).isoformat(),
+                "127.0.0.1",
+                "127.0.0.1",
+                12345,
+                54321,
+                "outgoing",
+                json.dumps({"jsonrpc": "2.0", "method": "test", "id": 1}),
+            ),
+        )
+        conn.commit()
 
     logs = fetch_logs(limit=1)
     assert len(logs) == 1

@@ -1,4 +1,4 @@
-.PHONY: install install-frontend build build-frontend dev dev-backend dev-frontend test test-watch coverage coverage-report lint format format-unsafe clean
+.PHONY: install install-frontend build build-frontend dev dev-backend dev-frontend test test-unit test-integration test-db test-network test-cli test-web test-mcp test-watch coverage coverage-report lint format format-unsafe clean
 
 # Install all dependencies
 install: install-backend install-frontend
@@ -30,6 +30,27 @@ dev-frontend:
 # Testing
 test:
 	python3 -m pytest -v
+
+test-unit:
+	python3 -m pytest tests/unit -v
+
+test-integration:
+	python3 -m pytest tests/integration -v
+
+test-db:
+	python3 -m pytest tests/integration/db -v
+
+test-network:
+	python3 -m pytest tests/integration/network -v
+
+test-cli:
+	python3 -m pytest tests/integration/cli -v
+
+test-web:
+	python3 -m pytest tests/integration/web -v
+
+test-mcp:
+	python3 -m pytest tests/integration/mcp -v
 
 test-watch:
 	python3 -m pytest -v --watch
