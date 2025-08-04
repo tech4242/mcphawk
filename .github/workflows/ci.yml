@@ -59,7 +59,4 @@ jobs:
         flags: unittests
         name: codecov-${{ matrix.python-version }}
         token: ${{ secrets.CODECOV_TOKEN }}
-        override_commit: ${{ github.event.pull_request.head.sha }}
-        override_pr: ${{ github.event.number }}
-        override_branch: ${{ github.head_ref }}
         verbose: true
