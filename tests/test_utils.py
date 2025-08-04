@@ -2,7 +2,13 @@
 
 import json
 
-from mcphawk.utils import get_message_type, get_method_name, parse_message
+from mcphawk.utils import (
+    extract_client_info,
+    extract_server_info,
+    get_message_type,
+    get_method_name,
+    parse_message,
+)
 
 
 class TestParseMessage:
@@ -163,3 +169,172 @@ class TestGetMethodName:
         """Test extracting method from invalid JSON."""
         message = "not json"
         assert get_method_name(message) is None
+
+
+class TestExtractServerInfo:
+    """Test extract_server_info function."""
+
+    def test_extract_server_info_from_initialize_response(self):
+        """Test extracting serverInfo from initialize response."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "serverInfo": {
+                    "name": "test-server",
+                    "version": "1.0.0"
+                }
+            },
+            "id": "123"
+        })
+        result = extract_server_info(message)
+        assert result == {"name": "test-server", "version": "1.0.0"}
+
+    def test_extract_server_info_missing_version(self):
+        """Test extracting serverInfo without version."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "result": {
+                "serverInfo": {
+                    "name": "test-server"
+                }
+            },
+            "id": "123"
+        })
+        result = extract_server_info(message)
+        assert result == {"name": "test-server", "version": "unknown"}
+
+    def test_extract_server_info_from_non_initialize(self):
+        """Test extracting serverInfo from non-initialize response."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "result": {"tools": []},
+            "id": "123"
+        })
+        result = extract_server_info(message)
+        assert result is None
+
+    def test_extract_server_info_from_request(self):
+        """Test extracting serverInfo from request (should be None)."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": {},
+            "id": "123"
+        })
+        result = extract_server_info(message)
+        assert result is None
+
+    def test_extract_server_info_invalid_json(self):
+        """Test extracting serverInfo from invalid JSON."""
+        message = "not json"
+        result = extract_server_info(message)
+        assert result is None
+
+    def test_extract_server_info_missing_name(self):
+        """Test extracting serverInfo without name field."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "result": {
+                "serverInfo": {
+                    "version": "1.0.0"
+                }
+            },
+            "id": "123"
+        })
+        result = extract_server_info(message)
+        assert result is None
+
+
+class TestExtractClientInfo:
+    """Test extract_client_info function."""
+
+    def test_extract_client_info_from_initialize_request(self):
+        """Test extracting clientInfo from initialize request."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "2.0.0"
+                }
+            },
+            "id": "123"
+        })
+        result = extract_client_info(message)
+        assert result == {"name": "test-client", "version": "2.0.0"}
+
+    def test_extract_client_info_missing_version(self):
+        """Test extracting clientInfo without version."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": {
+                "clientInfo": {
+                    "name": "test-client"
+                }
+            },
+            "id": "123"
+        })
+        result = extract_client_info(message)
+        assert result == {"name": "test-client", "version": "unknown"}
+
+    def test_extract_client_info_from_non_initialize(self):
+        """Test extracting clientInfo from non-initialize request."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "params": {},
+            "id": "123"
+        })
+        result = extract_client_info(message)
+        assert result is None
+
+    def test_extract_client_info_from_response(self):
+        """Test extracting clientInfo from response (should be None)."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "result": {"tools": []},
+            "id": "123"
+        })
+        result = extract_client_info(message)
+        assert result is None
+
+    def test_extract_client_info_invalid_json(self):
+        """Test extracting clientInfo from invalid JSON."""
+        message = "not json"
+        result = extract_client_info(message)
+        assert result is None
+
+    def test_extract_client_info_missing_name(self):
+        """Test extracting clientInfo without name field."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": {
+                "clientInfo": {
+                    "version": "2.0.0"
+                }
+            },
+            "id": "123"
+        })
+        result = extract_client_info(message)
+        assert result is None
+
+    def test_extract_client_info_wrong_method(self):
+        """Test extracting clientInfo with wrong method."""
+        message = json.dumps({
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "params": {
+                "clientInfo": {
+                    "name": "test-client",
+                    "version": "2.0.0"
+                }
+            },
+            "id": "123"
+        })
+        result = extract_client_info(message)
+        assert result is None

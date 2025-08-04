@@ -9,6 +9,7 @@ from mcphawk.logger import init_db
 from mcphawk.mcp_server.server import MCPHawkServer
 from mcphawk.sniffer import start_sniffer
 from mcphawk.web.server import run_web
+from mcphawk.wrapper import run_wrapper
 
 # Suppress Scapy warnings about network interfaces
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
@@ -50,16 +51,20 @@ def sniff(
         logger.error("  mcphawk sniff --auto-detect")
         raise typer.Exit(1)
 
+    # Determine filter expression
     if filter:
         # User provided custom filter
         filter_expr = filter
     elif port:
         # User provided specific port
         filter_expr = f"tcp port {port}"
-    else:
+    elif auto_detect:
         # Auto-detect mode - capture all TCP traffic
         filter_expr = "tcp"
         logger.info("Auto-detect mode: monitoring all TCP traffic for MCP messages")
+    else:
+        # Default to tcp
+        filter_expr = "tcp"
 
     # Start MCP server if requested
     mcp_thread = None
@@ -136,14 +141,16 @@ def web(
         raise typer.Exit(1)
 
     # Prepare filter expression
-    if filter:
+    if no_sniffer:
+        filter_expr = None  # No sniffer
+    elif filter:
         filter_expr = filter
     elif port:
         filter_expr = f"tcp port {port}"
     elif auto_detect:
         filter_expr = "tcp"
     else:
-        filter_expr = None  # No sniffer
+        filter_expr = "tcp"  # Default
 
     # Start MCP server if requested
     mcp_thread = None
@@ -239,6 +246,43 @@ def mcp(
     except KeyboardInterrupt:
         logger.info("MCP server stopped.")
         sys.exit(0)
+
+
+@app.command()
+def wrap(
+    command: list[str] = typer.Argument(..., help="MCP server command and arguments"),
+    debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug output")
+):
+    """Wrap an MCP server to capture stdio traffic transparently.
+
+    Usage:
+        mcphawk wrap /path/to/mcp-server --arg1 --arg2
+
+    Configure in Claude Desktop settings:
+        Instead of:
+            "command": "/path/to/mcp-server",
+            "args": ["--arg1", "--arg2"]
+
+        Use:
+            "command": "mcphawk",
+            "args": ["wrap", "/path/to/mcp-server", "--arg1", "--arg2"]
+    """
+    # Configure logging
+    logger.handlers.clear()
+    handler = logging.StreamHandler(sys.stderr)  # Use stderr to avoid interfering with stdio
+    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+
+    if not command:
+        logger.error("No command specified to wrap")
+        raise typer.Exit(1)
+
+    logger.info(f"Starting MCP wrapper for: {' '.join(command)}")
+
+    # Run the wrapper
+    exit_code = run_wrapper(command, debug=debug)
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

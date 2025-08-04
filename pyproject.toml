@@ -4,18 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcphawk"
-version = "0.1.0"
+version = "0.3.0"
 description = "A passive MCP (Model Context Protocol) traffic sniffer for WebSocket-based MCP servers."
 authors = [
   { name = "Your Name", email = "you@example.com" }
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
   "scapy>=2.5.0",
   "psutil>=6.0.0",
-  "typer>=0.12.0"
+  "typer>=0.12.0",
+  "fastapi>=0.116.1",
+  "uvicorn>=0.35.0",
+  "mcp>=1.0.0"
 ]
 
 [project.urls]
@@ -83,6 +86,8 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # Ignore assert statements in tests
 "test_*.py" = ["S101", "E712"]
 "tests/*.py" = ["S101", "E712"]
+# Ignore Typer argument pattern in CLI
+"mcphawk/cli.py" = ["B008"]
 
 [tool.coverage.run]
 omit = [
