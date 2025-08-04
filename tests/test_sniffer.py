@@ -1,6 +1,5 @@
 import os
 import socket
-import sqlite3
 import threading
 import time
 from unittest.mock import MagicMock, patch
@@ -11,7 +10,7 @@ from scapy.layers.inet import IP, TCP
 from scapy.layers.inet6 import IPv6
 from scapy.packet import Raw
 
-from mcphawk.logger import init_db, set_db_path
+from mcphawk.logger import get_db_connection, init_db, set_db_path
 from mcphawk.sniffer import packet_callback, start_sniffer
 
 # --- TEST DB PATH ---
@@ -84,11 +83,12 @@ def test_packet_callback(clean_db, dummy_server):
     )
     packet_callback(pkt)
 
-    conn = sqlite3.connect(TEST_DB)
-    cur = conn.cursor()
-    cur.execute("SELECT message FROM logs ORDER BY log_id DESC LIMIT 1;")
-    logged_msg = cur.fetchone()[0]
-    conn.close()
+    from pathlib import Path
+
+    with get_db_connection(Path(TEST_DB)) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT message FROM logs ORDER BY log_id DESC LIMIT 1;")
+        logged_msg = cur.fetchone()[0]
 
     assert "weather" in logged_msg
     assert "Berlin" in logged_msg

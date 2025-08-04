@@ -47,12 +47,13 @@ def clean_db(setup_test_db):
     """
     Ensure the database is cleared before each test.
     """
-    import sqlite3
+    from pathlib import Path
 
-    conn = sqlite3.connect(TEST_DB_PATH)
-    with conn:
+    from mcphawk.logger import get_db_connection
+
+    with get_db_connection(Path(TEST_DB_PATH)) as conn:
         conn.execute("DELETE FROM logs;")
-    conn.close()
+        conn.commit()
     yield
 
 

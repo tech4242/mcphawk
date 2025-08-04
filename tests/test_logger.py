@@ -7,7 +7,88 @@ from pathlib import Path
 
 import pytest
 
-from mcphawk.logger import fetch_logs, init_db, log_message, set_db_path
+from mcphawk.logger import (
+    fetch_logs,
+    get_db_connection,
+    init_db,
+    log_message,
+    set_db_path,
+)
+
+
+class TestDBConnection:
+    """Test the database connection context manager."""
+
+    @pytest.fixture
+    def temp_db(self):
+        """Create a temporary database for testing."""
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+            temp_path = Path(f.name)
+
+        yield temp_path
+
+        # Cleanup
+        temp_path.unlink(missing_ok=True)
+
+    def test_context_manager_basic(self, temp_db):
+        """Test basic context manager functionality."""
+        # Create a simple table for testing
+        with get_db_connection(temp_db) as conn:
+            cur = conn.cursor()
+            cur.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, data TEXT)")
+            conn.commit()
+
+        # Verify connection is closed by trying to use it
+        with pytest.raises(sqlite3.ProgrammingError):
+            cur.execute("SELECT * FROM test")
+
+    def test_context_manager_with_error(self, temp_db):
+        """Test context manager closes connection even on error."""
+        # Create a simple table
+        with get_db_connection(temp_db) as conn:
+            cur = conn.cursor()
+            cur.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+            conn.commit()
+
+        # Force an error inside context
+        try:
+            with get_db_connection(temp_db) as conn:
+                cur = conn.cursor()
+                # This will raise an error (table already exists)
+                cur.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+        except sqlite3.OperationalError:
+            pass
+
+        # Connection should still be closed
+        with pytest.raises(sqlite3.ProgrammingError):
+            cur.execute("SELECT * FROM test")
+
+    def test_context_manager_row_factory(self, temp_db):
+        """Test that row_factory is set correctly."""
+        # Create and populate a table
+        with get_db_connection(temp_db) as conn:
+            cur = conn.cursor()
+            cur.execute("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
+            cur.execute("INSERT INTO test (name) VALUES (?)", ("test_name",))
+            conn.commit()
+
+        # Verify row_factory allows dict-like access
+        with get_db_connection(temp_db) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM test")
+            row = cur.fetchone()
+            assert row["name"] == "test_name"
+            assert row["id"] == 1
+
+    def test_context_manager_uses_default_path(self):
+        """Test that context manager uses default DB_PATH when None provided."""
+        # When None is provided, it should use the default DB_PATH
+        with get_db_connection(None) as conn:
+            # Should connect successfully using default path
+            cur = conn.cursor()
+            cur.execute("SELECT 1")
+            result = cur.fetchone()
+            assert result[0] == 1
 
 
 class TestLogger:
@@ -34,33 +115,31 @@ class TestLogger:
         assert Path(temp_db).exists()
 
         # Check schema
-        conn = sqlite3.connect(temp_db)
-        cursor = conn.cursor()
+        with get_db_connection(Path(temp_db)) as conn:
+            cursor = conn.cursor()
 
-        # Get table info
-        cursor.execute("PRAGMA table_info(logs)")
-        columns = {col[1]: col[2] for col in cursor.fetchall()}
+            # Get table info
+            cursor.execute("PRAGMA table_info(logs)")
+            columns = {col[1]: col[2] for col in cursor.fetchall()}
 
-        # Check all expected columns exist
-        expected_columns = {
-            "log_id": "TEXT",
-            "timestamp": "DATETIME",
-            "src_ip": "TEXT",
-            "dst_ip": "TEXT",
-            "src_port": "INTEGER",
-            "dst_port": "INTEGER",
-            "direction": "TEXT",
-            "message": "TEXT",
-            "transport_type": "TEXT",
-            "metadata": "TEXT",
-            "pid": "INTEGER"
-        }
+            # Check all expected columns exist
+            expected_columns = {
+                "log_id": "TEXT",
+                "timestamp": "DATETIME",
+                "src_ip": "TEXT",
+                "dst_ip": "TEXT",
+                "src_port": "INTEGER",
+                "dst_port": "INTEGER",
+                "direction": "TEXT",
+                "message": "TEXT",
+                "transport_type": "TEXT",
+                "metadata": "TEXT",
+                "pid": "INTEGER"
+            }
 
-        for col, dtype in expected_columns.items():
-            assert col in columns
-            assert columns[col] == dtype
-
-        conn.close()
+            for col, dtype in expected_columns.items():
+                assert col in columns
+                assert columns[col] == dtype
 
     def test_log_message_basic(self, temp_db):
         """Test basic message logging."""
@@ -137,17 +216,15 @@ class TestPIDSupport:
 
     def test_schema_includes_pid(self, temp_db):
         """Test that database schema includes PID column."""
-        conn = sqlite3.connect(temp_db)
-        cursor = conn.cursor()
+        with get_db_connection(Path(temp_db)) as conn:
+            cursor = conn.cursor()
 
-        # Get table info
-        cursor.execute("PRAGMA table_info(logs)")
-        columns = {col[1]: col[2] for col in cursor.fetchall()}
+            # Get table info
+            cursor.execute("PRAGMA table_info(logs)")
+            columns = {col[1]: col[2] for col in cursor.fetchall()}
 
-        assert "pid" in columns
-        assert columns["pid"] == "INTEGER"
-
-        conn.close()
+            assert "pid" in columns
+            assert columns["pid"] == "INTEGER"
 
     def test_log_message_with_pid(self, temp_db):
         """Test logging message with PID."""
@@ -269,44 +346,40 @@ class TestPIDSupport:
             log_message(entry)
 
         # Direct SQL query to filter by PID
-        conn = sqlite3.connect(temp_db)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with get_db_connection(Path(temp_db)) as conn:
+            cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM logs WHERE pid = ?", (12345,))
-        rows = cursor.fetchall()
+            cursor.execute("SELECT * FROM logs WHERE pid = ?", (12345,))
+            rows = cursor.fetchall()
 
-        assert len(rows) == 2
-        for row in rows:
-            assert row["pid"] == 12345
-
-        conn.close()
+            assert len(rows) == 2
+            for row in rows:
+                assert row["pid"] == 12345
 
     def test_backward_compatibility(self, temp_db):
         """Test that old logs without PID field still work."""
         # Directly insert an old-style log without PID
-        conn = sqlite3.connect(temp_db)
-        cursor = conn.cursor()
+        with get_db_connection(Path(temp_db)) as conn:
+            cursor = conn.cursor()
 
-        # Insert without specifying PID (should be NULL)
-        cursor.execute("""
-            INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port,
-                            direction, message, transport_type, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            "old-style-1",
-            datetime.now(tz=timezone.utc).isoformat(),
-            "127.0.0.1",
-            "127.0.0.1",
-            3000,
-            3001,
-            "outgoing",
-            '{"jsonrpc":"2.0","method":"test","id":1}',
-            "streamable_http",
-            '{}'
-        ))
-        conn.commit()
-        conn.close()
+            # Insert without specifying PID (should be NULL)
+            cursor.execute("""
+                INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port,
+                                direction, message, transport_type, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                "old-style-1",
+                datetime.now(tz=timezone.utc).isoformat(),
+                "127.0.0.1",
+                "127.0.0.1",
+                3000,
+                3001,
+                "outgoing",
+                '{"jsonrpc":"2.0","method":"test","id":1}',
+                "streamable_http",
+                '{}'
+            ))
+            conn.commit()
 
         # Fetch logs should work
         logs = fetch_logs(1)
