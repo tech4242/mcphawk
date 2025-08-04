@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import platform
 import uuid
@@ -15,6 +16,14 @@ from mcphawk.web.broadcaster import broadcast_new_log  # noqa: E402
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
+
+# Server registry to track server names by connection
+_server_registry = {}  # {connection_id: server_info}
+
+
+def _get_connection_id(src_ip: str, src_port: int, dst_ip: str, dst_port: int) -> str:
+    """Generate unique connection identifier for HTTP connections."""
+    return f"{src_ip}:{src_port}->{dst_ip}:{dst_port}"
 
 
 async def _safe_broadcast(log_entry: dict) -> None:
@@ -84,6 +93,25 @@ def packet_callback(pkt):
             # Use transport type from TCP reassembler
             transport = msg_info.get("transport", "unknown")
 
+            # Determine direction based on message type
+            from .utils import extract_server_info
+            direction = "unknown"
+
+            # For HTTP, incoming = server->client, outgoing = client->server
+            if msg_info.get("type") == "HTTP Response":
+                direction = "incoming"
+                # Check for server info in response
+                server_info = extract_server_info(msg_info["message"])
+                if server_info:
+                    conn_id = _get_connection_id(
+                        msg_info["dst_ip"], msg_info["dst_port"],
+                        msg_info["src_ip"], msg_info["src_port"]
+                    )
+                    _server_registry[conn_id] = server_info
+                    logger.debug(f"Captured server info for {conn_id}: {server_info}")
+            else:
+                direction = "outgoing"
+
             entry = {
                 "log_id": log_id,
                 "timestamp": ts,
@@ -91,14 +119,28 @@ def packet_callback(pkt):
                 "src_port": msg_info["src_port"],
                 "dst_ip": msg_info["dst_ip"],
                 "dst_port": msg_info["dst_port"],
-                "direction": "unknown",
+                "direction": direction,
                 "message": msg_info["message"],
                 "transport_type": transport,
             }
 
-            # Add metadata if this is MCPHawk's own MCP traffic
-            if msg_info["src_port"] in _mcphawk_mcp_ports or msg_info["dst_port"] in _mcphawk_mcp_ports:
-                entry["metadata"] = '{"source": "mcphawk-mcp"}'
+            # Build metadata
+            metadata = {}
+
+            # Add server info if we have it
+            conn_id = _get_connection_id(
+                msg_info["src_ip"], msg_info["src_port"],
+                msg_info["dst_ip"], msg_info["dst_port"]
+            )
+            if conn_id in _server_registry:
+                server_info = _server_registry[conn_id]
+                metadata["server_name"] = server_info["name"]
+                metadata["server_version"] = server_info["version"]
+
+            # MCPHawk's own traffic will be identified by server_name in metadata
+
+            if metadata:
+                entry["metadata"] = json.dumps(metadata)
 
             log_message(entry)
 
@@ -202,6 +244,27 @@ def packet_callback(pkt):
                 if _auto_detect_mode and transport != "unknown":
                     logger.debug(f"Auto-detect: Found transport {transport} for {src_ip}:{src_port} -> {dst_ip}:{dst_port}")
 
+                # Determine direction and check for server info
+                from .utils import extract_server_info
+                direction = "unknown"
+
+                # For raw TCP, we need to infer direction
+                # If it's a response (has result or error), it's incoming
+                try:
+                    msg = json.loads(decoded)
+                    if "result" in msg or "error" in msg:
+                        direction = "incoming"
+                        # Check for server info
+                        server_info = extract_server_info(decoded)
+                        if server_info:
+                            conn_id = _get_connection_id(dst_ip, dst_port, src_ip, src_port)
+                            _server_registry[conn_id] = server_info
+                            logger.debug(f"Captured server info for {conn_id}: {server_info}")
+                    elif "method" in msg:
+                        direction = "outgoing"
+                except json.JSONDecodeError:
+                    pass
+
                 entry = {
                     "log_id": log_id,
                     "timestamp": ts,
@@ -209,14 +272,25 @@ def packet_callback(pkt):
                     "src_port": src_port,
                     "dst_ip": dst_ip,
                     "dst_port": dst_port,
-                    "direction": "unknown",
+                    "direction": direction,
                     "message": decoded,
                     "transport_type": transport,
                 }
 
-                # Add metadata if this is MCPHawk's own MCP traffic
-                if src_port in _mcphawk_mcp_ports or dst_port in _mcphawk_mcp_ports:
-                    entry["metadata"] = '{"source": "mcphawk-mcp"}'
+                # Build metadata
+                metadata = {}
+
+                # Add server info if we have it
+                conn_id = _get_connection_id(src_ip, src_port, dst_ip, dst_port)
+                if conn_id in _server_registry:
+                    server_info = _server_registry[conn_id]
+                    metadata["server_name"] = server_info["name"]
+                    metadata["server_version"] = server_info["version"]
+
+                # MCPHawk's own traffic will be identified by server_name in metadata
+
+                if metadata:
+                    entry["metadata"] = json.dumps(metadata)
 
                 log_message(entry)
 
@@ -239,6 +313,7 @@ def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = F
         auto_detect: If True, automatically detect MCP traffic on any port
         debug: If True, enable debug logging
         mcphawk_mcp_ports: List of ports where MCPHawk's own MCP server is running
+        stdio: If True, also monitor stdio for JSON-RPC messages
     """
     global _auto_detect_mode, _excluded_ports, _mcphawk_mcp_ports
     _auto_detect_mode = auto_detect
@@ -257,5 +332,9 @@ def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = F
     # Ensure better pcap support on macOS
     conf.use_pcap = True
 
-    iface = "lo0" if platform.system() == "Darwin" else None
-    sniff(filter=filter_expr, iface=iface, prn=packet_callback, store=False)
+    try:
+        iface = "lo0" if platform.system() == "Darwin" else None
+        sniff(filter=filter_expr, iface=iface, prn=packet_callback, store=False)
+    except KeyboardInterrupt:
+        logger.debug("Sniffer interrupted by user")
+        raise

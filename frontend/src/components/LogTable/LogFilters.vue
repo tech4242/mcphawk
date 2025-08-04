@@ -33,6 +33,32 @@
         <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
       </div>
 
+      <!-- Transport type filter -->
+      <select
+        v-model="selectedTransport"
+        @change="logStore.setTransportFilter(selectedTransport)"
+        class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-mcp-blue focus:border-transparent"
+      >
+        <option value="all">All Transports</option>
+        <option value="streamable_http">Streamable HTTP</option>
+        <option value="http_sse">HTTP+SSE</option>
+        <option value="stdio">stdio</option>
+        <option value="unknown">Unknown</option>
+      </select>
+
+      <!-- Server filter -->
+      <select
+        v-if="logStore.uniqueServers.length > 0"
+        v-model="selectedServer"
+        @change="logStore.setServerFilter(selectedServer)"
+        class="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-mcp-blue focus:border-transparent"
+      >
+        <option value="all">All Servers</option>
+        <option v-for="server in logStore.uniqueServers" :key="server" :value="server">
+          {{ server }}
+        </option>
+      </select>
+
       <!-- Expand all -->
       <button
         @click="logStore.toggleExpandAll"
@@ -48,20 +74,6 @@
         <span class="hidden sm:inline">{{ logStore.expandAll ? 'Collapse' : 'Expand' }}</span>
       </button>
 
-      <!-- Toggle MCPHawk traffic -->
-      <button
-        @click="logStore.toggleMcpHawkTraffic"
-        class="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
-        :class="[
-          logStore.showMcpHawkTraffic
-            ? 'bg-purple-600 text-white'
-            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-        ]"
-        :title="logStore.showMcpHawkTraffic ? 'Hide MCPHawk\'s own MCP traffic' : 'Show MCPHawk\'s own MCP traffic'"
-      >
-        <FunnelIcon class="h-5 w-5" />
-        <span class="hidden lg:inline">MCPHawk</span>
-      </button>
 
       <!-- Clear logs -->
       <button
@@ -87,11 +99,13 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useLogStore } from '@/stores/logs'
-import { MagnifyingGlassIcon, TrashIcon, ArrowPathIcon, CodeBracketIcon, FunnelIcon } from '@heroicons/vue/24/outline'
+import { MagnifyingGlassIcon, TrashIcon, ArrowPathIcon, CodeBracketIcon } from '@heroicons/vue/24/outline'
 
 const logStore = useLogStore()
 
 const searchQuery = ref('')
+const selectedTransport = ref('all')
+const selectedServer = ref('all')
 
 const filters = computed(() => [
   { label: 'All', value: 'all', count: logStore.stats.total },

@@ -8,35 +8,44 @@ export const useLogStore = defineStore('logs', () => {
   const logs = ref([])
   const filter = ref('all')
   const searchQuery = ref('')
+  const transportFilter = ref('all')
+  const serverFilter = ref('all')
   const showPairing = ref(false)
   const selectedLogId = ref(null)
   const loading = ref(false)
   const error = ref(null)
   const expandAll = ref(false)
-  const showMcpHawkTraffic = ref(false)
 
   // Computed
   const filteredLogs = computed(() => {
     let result = logs.value
-
-    // Filter out MCPHawk's own traffic if toggle is off
-    if (!showMcpHawkTraffic.value) {
-      result = result.filter(log => {
-        if (!log.metadata) return true
-        try {
-          const meta = JSON.parse(log.metadata)
-          return meta.source !== 'mcphawk-mcp'
-        } catch {
-          return true
-        }
-      })
-    }
 
     // Apply type filter
     if (filter.value !== 'all') {
       result = result.filter(log => {
         const msgType = getMessageType(log.message)
         return msgType === filter.value
+      })
+    }
+
+    // Apply transport filter
+    if (transportFilter.value !== 'all') {
+      result = result.filter(log => {
+        const transport = log.transport_type || log.traffic_type || 'unknown'
+        return transport === transportFilter.value
+      })
+    }
+
+    // Apply server filter
+    if (serverFilter.value !== 'all') {
+      result = result.filter(log => {
+        if (!log.metadata) return false
+        try {
+          const meta = JSON.parse(log.metadata)
+          return meta.server_name === serverFilter.value
+        } catch {
+          return false
+        }
       })
     }
 
@@ -57,8 +66,7 @@ export const useLogStore = defineStore('logs', () => {
       requests: 0,
       responses: 0,
       notifications: 0,
-      errors: 0,
-      mcphawk: 0
+      errors: 0
     }
 
     logs.value.forEach(log => {
@@ -67,16 +75,6 @@ export const useLogStore = defineStore('logs', () => {
       else if (msgType === 'response') stats.responses++
       else if (msgType === 'notification') stats.notifications++
       else if (msgType === 'error') stats.errors++
-      
-      // Count MCPHawk's own traffic
-      if (log.metadata) {
-        try {
-          const meta = JSON.parse(log.metadata)
-          if (meta.source === 'mcphawk-mcp') stats.mcphawk++
-        } catch {
-          // ignore parse errors
-        }
-      }
     })
 
     return stats
@@ -84,6 +82,23 @@ export const useLogStore = defineStore('logs', () => {
 
   const selectedLog = computed(() => {
     return logs.value.find(log => log.log_id === selectedLogId.value)
+  })
+
+  const uniqueServers = computed(() => {
+    const servers = new Set()
+    logs.value.forEach(log => {
+      if (log.metadata) {
+        try {
+          const meta = JSON.parse(log.metadata)
+          if (meta.server_name) {
+            servers.add(meta.server_name)
+          }
+        } catch {
+          // ignore
+        }
+      }
+    })
+    return Array.from(servers).sort()
   })
 
   const pairedLogs = computed(() => {
@@ -156,8 +171,12 @@ export const useLogStore = defineStore('logs', () => {
     expandAll.value = !expandAll.value
   }
 
-  function toggleMcpHawkTraffic() {
-    showMcpHawkTraffic.value = !showMcpHawkTraffic.value
+  function setTransportFilter(transport) {
+    transportFilter.value = transport
+  }
+
+  function setServerFilter(server) {
+    serverFilter.value = server
   }
 
   return {
@@ -165,17 +184,19 @@ export const useLogStore = defineStore('logs', () => {
     logs,
     filter,
     searchQuery,
+    transportFilter,
+    serverFilter,
     showPairing,
     selectedLogId,
     loading,
     error,
     expandAll,
-    showMcpHawkTraffic,
     
     // Computed
     filteredLogs,
     stats,
     selectedLog,
+    uniqueServers,
     pairedLogs,
     
     // Actions
@@ -185,8 +206,9 @@ export const useLogStore = defineStore('logs', () => {
     selectLog,
     setFilter,
     setSearchQuery,
+    setTransportFilter,
+    setServerFilter,
     togglePairing,
-    toggleExpandAll,
-    toggleMcpHawkTraffic
+    toggleExpandAll
   }
 })

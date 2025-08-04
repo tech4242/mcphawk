@@ -31,7 +31,13 @@
               
               <div v-if="logStore.selectedLog" class="space-y-4">
                 <!-- Message metadata -->
-                <div class="grid grid-cols-2 gap-4 text-sm">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span class="text-gray-500 dark:text-gray-400">Log ID:</span>
+                    <span class="ml-2 font-mono text-gray-900 dark:text-gray-100 text-xs">
+                      {{ logStore.selectedLog.log_id }}
+                    </span>
+                  </div>
                   <div>
                     <span class="text-gray-500 dark:text-gray-400">Time:</span>
                     <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
@@ -41,10 +47,17 @@
                   <div>
                     <span class="text-gray-500 dark:text-gray-400">Type:</span>
                     <MessageTypeBadge :type="messageType" class="ml-2" />
-                    <span v-if="isMcpHawkTraffic" 
-                          class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-                          title="MCPHawk's own MCP traffic">
-                      MCP🦅
+                  </div>
+                  <div>
+                    <span class="text-gray-500 dark:text-gray-400">Message ID:</span>
+                    <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
+                      {{ messageId }}
+                    </span>
+                  </div>
+                  <div>
+                    <span class="text-gray-500 dark:text-gray-400">Direction:</span>
+                    <span class="ml-2 text-gray-900 dark:text-gray-100">
+                      {{ logStore.selectedLog.direction }} {{ getDirectionIcon(logStore.selectedLog.direction) }}
                     </span>
                   </div>
                   <div>
@@ -57,15 +70,33 @@
                     </span>
                   </div>
                   <div>
+                    <span class="text-gray-500 dark:text-gray-400">Server:</span>
+                    <span class="ml-2 text-gray-900 dark:text-gray-100">
+                      {{ serverInfo ? `${serverInfo.name} v${serverInfo.version}` : '-' }}
+                    </span>
+                  </div>
+                  <div v-if="clientInfo">
+                    <span class="text-gray-500 dark:text-gray-400">Client:</span>
+                    <span class="ml-2 text-gray-900 dark:text-gray-100">
+                      {{ clientInfo.name }} v{{ clientInfo.version }}
+                    </span>
+                  </div>
+                  <div>
+                    <span class="text-gray-500 dark:text-gray-400">PID:</span>
+                    <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
+                      {{ logStore.selectedLog.pid || '-' }}
+                    </span>
+                  </div>
+                  <div>
                     <span class="text-gray-500 dark:text-gray-400">Source:</span>
                     <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
-                      {{ logStore.selectedLog.src_ip }}:{{ logStore.selectedLog.src_port }}
+                      {{ logStore.selectedLog.src_ip }}{{ logStore.selectedLog.src_port ? ':' + logStore.selectedLog.src_port : '' }}
                     </span>
                   </div>
                   <div>
                     <span class="text-gray-500 dark:text-gray-400">Destination:</span>
                     <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
-                      {{ logStore.selectedLog.dst_ip }}:{{ logStore.selectedLog.dst_port }}
+                      {{ logStore.selectedLog.dst_ip }}{{ logStore.selectedLog.dst_port ? ':' + logStore.selectedLog.dst_port : '' }}
                     </span>
                   </div>
                 </div>
@@ -84,6 +115,16 @@
                   </div>
                   <div class="p-4 bg-gray-900 overflow-x-auto">
                     <pre class="text-sm text-gray-100 font-mono whitespace-pre">{{ formattedJson }}</pre>
+                  </div>
+                </div>
+
+                <!-- Raw metadata if available -->
+                <div v-if="logStore.selectedLog.metadata && logStore.selectedLog.metadata !== '{}'">
+                  <div class="bg-gray-50 dark:bg-gray-700 px-4 py-2">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Metadata</span>
+                  </div>
+                  <div class="p-4 bg-gray-900 overflow-x-auto">
+                    <pre class="text-sm text-gray-400 font-mono whitespace-pre">{{ formattedMetadata }}</pre>
                   </div>
                 </div>
 
@@ -125,7 +166,7 @@ import { computed, ref } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import { ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
 import { useLogStore } from '@/stores/logs'
-import { getMessageType, parseMessage } from '@/utils/messageParser'
+import { getMessageType, parseMessage, getDirectionIcon } from '@/utils/messageParser'
 import { formatTransportType, getTransportTypeColor } from '@/utils/transportFormatter'
 import MessageTypeBadge from '@/components/LogTable/MessageTypeBadge.vue'
 import PairedMessages from '@/components/common/PairedMessages.vue'
@@ -144,13 +185,58 @@ const formattedJson = computed(() => {
   return JSON.stringify(parsed, null, 2)
 })
 
-const isMcpHawkTraffic = computed(() => {
-  if (!logStore.selectedLog?.metadata) return false
+const messageId = computed(() => {
+  if (!logStore.selectedLog) return '-'
+  try {
+    const parsed = JSON.parse(logStore.selectedLog.message)
+    if (parsed && parsed.id !== undefined) {
+      return parsed.id
+    }
+  } catch {
+    // ignore
+  }
+  return '-'
+})
+
+const serverInfo = computed(() => {
+  if (!logStore.selectedLog?.metadata) return null
   try {
     const meta = JSON.parse(logStore.selectedLog.metadata)
-    return meta.source === 'mcphawk-mcp'
+    if (meta.server_name) {
+      return {
+        name: meta.server_name,
+        version: meta.server_version || ''
+      }
+    }
   } catch {
-    return false
+    // ignore
+  }
+  return null
+})
+
+const clientInfo = computed(() => {
+  if (!logStore.selectedLog?.metadata) return null
+  try {
+    const meta = JSON.parse(logStore.selectedLog.metadata)
+    if (meta.client_name) {
+      return {
+        name: meta.client_name,
+        version: meta.client_version || ''
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null
+})
+
+const formattedMetadata = computed(() => {
+  if (!logStore.selectedLog?.metadata) return ''
+  try {
+    const meta = JSON.parse(logStore.selectedLog.metadata)
+    return JSON.stringify(meta, null, 2)
+  } catch {
+    return logStore.selectedLog.metadata
   }
 })
 

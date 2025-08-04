@@ -73,19 +73,30 @@ export function getMessageSummary(message) {
   
   switch (type) {
     case 'request':
-      return `${parsed.method}(${parsed.id})`
+      return parsed.method
     case 'response':
-      return `Response(${parsed.id})`
+      // Show the result or just "Response" if complex
+      if (parsed.result !== undefined) {
+        if (typeof parsed.result === 'string' || typeof parsed.result === 'number' || typeof parsed.result === 'boolean') {
+          return `Result: ${parsed.result}`
+        }
+        return 'Response'
+      }
+      return 'Response'
     case 'notification':
-      return `${parsed.method}`
+      return parsed.method
     case 'error':
-      return `Error(${parsed.id}): ${parsed.error.message}`
+      return `Error: ${parsed.error.message}`
     default:
       return 'Unknown message type'
   }
 }
 
 export function getPortInfo(log) {
+  // For stdio transport, don't show ports
+  if (log.transport_type === 'stdio') {
+    return '-'
+  }
   return `${log.src_port || '?'} → ${log.dst_port || '?'}`
 }
 

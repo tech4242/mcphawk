@@ -38,7 +38,8 @@ def init_db() -> None:
             direction TEXT CHECK(direction IN ('incoming', 'outgoing', 'unknown')),
             message TEXT,
             transport_type TEXT,
-            metadata TEXT
+            metadata TEXT,
+            pid INTEGER
         )
         """
     )
@@ -72,8 +73,8 @@ def log_message(entry: dict[str, Any]) -> None:
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO logs (log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata, pid)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             log_id,
@@ -86,6 +87,7 @@ def log_message(entry: dict[str, Any]) -> None:
             entry.get("message"),
             entry.get("transport_type", "unknown"),
             entry.get("metadata"),
+            entry.get("pid"),
         ),
     )
     conn.commit()
@@ -116,7 +118,7 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata, pid
         FROM logs
         ORDER BY timestamp DESC
         LIMIT ?
@@ -138,6 +140,7 @@ def fetch_logs(limit: int = 100) -> list[dict[str, Any]]:
             "message": row["message"],
             "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
             "metadata": row["metadata"],
+            "pid": row["pid"],
         }
         for row in rows
     ]
@@ -234,7 +237,7 @@ def fetch_logs_with_offset(limit: int = 100, offset: int = 0) -> list[dict[str, 
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata
+        SELECT log_id, timestamp, src_ip, dst_ip, src_port, dst_port, direction, message, transport_type, metadata, pid
         FROM logs
         ORDER BY log_id DESC
         LIMIT ? OFFSET ?
@@ -256,6 +259,7 @@ def fetch_logs_with_offset(limit: int = 100, offset: int = 0) -> list[dict[str, 
             "message": row["message"],
             "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
             "metadata": row["metadata"],
+            "pid": row["pid"],
         }
         for row in rows
     ]
@@ -315,6 +319,7 @@ def search_logs(search_term: str = "", message_type: str | None = None,
             "message": row["message"],
             "transport_type": row["transport_type"] if row["transport_type"] is not None else "unknown",
             "metadata": row["metadata"],
+            "pid": row["pid"],
         }
 
         # If message_type filter is specified, check it

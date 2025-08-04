@@ -3,11 +3,19 @@
 import logging
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from mcphawk.cli import app
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def mock_init_db():
+    """Mock init_db to avoid database issues in tests."""
+    with patch('mcphawk.cli.init_db'):
+        yield
 
 
 def test_cli_help():
@@ -451,7 +459,7 @@ def test_web_command_with_mcp(mock_thread, mock_mcp_server, mock_run_web):
         debug=False,
         excluded_ports=[8765],  # Default HTTP MCP port is excluded
         with_mcp=True,
-        mcphawk_mcp_ports=[]  # Empty in non-debug mode
+        mcphawk_mcp_ports=[],  # Empty in non-debug mode
     )
 
 
