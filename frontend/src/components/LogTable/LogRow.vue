@@ -11,22 +11,22 @@
       >
         <table class="w-full table-fixed">
           <tr>
-            <td class="px-4 py-3 text-left w-24 text-sm text-gray-900 dark:text-gray-100">
+            <td class="px-3 py-3 text-left w-20 text-sm text-gray-900 dark:text-gray-100">
               {{ formatDate(log.timestamp) }}
             </td>
-            <td class="px-4 py-3 text-left w-32 text-sm text-gray-900 dark:text-gray-100">
+            <td class="px-3 py-3 text-left w-24 text-sm text-gray-900 dark:text-gray-100">
               {{ formatTimestamp(log.timestamp) }}
             </td>
-            <td class="px-4 py-3 text-left w-32">
+            <td class="px-3 py-3 text-left w-24">
               <MessageTypeBadge :type="messageType" />
             </td>
-            <td class="px-4 py-3 text-left w-20 text-sm text-gray-900 dark:text-gray-100 font-mono">
+            <td class="px-3 py-3 text-left w-16 text-sm text-gray-900 dark:text-gray-100 font-mono">
               <span class="text-gray-600 dark:text-gray-400">{{ messageId }}</span>
             </td>
-            <td class="px-4 py-3 text-left text-sm text-gray-900 dark:text-gray-100 font-mono truncate">
+            <td class="px-3 py-3 text-left text-sm text-gray-900 dark:text-gray-100 font-mono truncate">
               {{ messageSummary }}
             </td>
-            <td class="px-4 py-3 text-left w-40 text-sm text-gray-500 dark:text-gray-400">
+            <td class="px-3 py-3 text-left w-32 text-sm text-gray-500 dark:text-gray-400">
               <span v-if="serverInfo" 
                     class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200"
                     :title="`${serverInfo.name} v${serverInfo.version}`">
@@ -34,7 +34,7 @@
               </span>
               <span v-else class="text-gray-400 dark:text-gray-600">-</span>
             </td>
-            <td class="px-4 py-3 text-left w-32 text-sm text-gray-500 dark:text-gray-400 font-mono">
+            <td class="px-3 py-3 text-left w-28 text-sm text-gray-500 dark:text-gray-400 font-mono">
               <span 
                 class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
                 :class="transportTypeColor"
@@ -42,17 +42,17 @@
                 {{ formattedTransportType }}
               </span>
             </td>
-            <td class="px-4 py-3 text-left w-48 text-sm text-gray-500 dark:text-gray-400">
+            <td class="px-3 py-3 text-left w-40 text-sm text-gray-500 dark:text-gray-400">
               <div class="flex items-center">
                 <span>{{ log.src_ip }}</span>
                 <span class="mx-2">{{ directionIcon }}</span>
                 <span>{{ log.dst_ip }}</span>
               </div>
             </td>
-            <td class="px-4 py-3 text-left w-24 text-sm text-gray-500 dark:text-gray-400 font-mono">
+            <td class="px-3 py-3 text-left w-20 text-sm text-gray-500 dark:text-gray-400 font-mono">
               {{ portInfo }}
             </td>
-            <td class="px-4 py-3 text-left w-20 text-sm text-gray-500 dark:text-gray-400 font-mono">
+            <td class="px-3 py-3 text-left w-16 text-sm text-gray-500 dark:text-gray-400 font-mono">
               {{ pidInfo }}
             </td>
           </tr>

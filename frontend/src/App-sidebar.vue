@@ -4,20 +4,16 @@
     <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 z-10">
       <div class="px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
-          <div class="flex items-center space-x-4">
-            <img src="/mcphawk_logo.png" alt="MCPHawk Logo" class="h-[62px]">
-            <div class="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
+          <div class="flex items-center">
             <button
-              @click="toggleSidebar"
-              class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
-              :title="sidebarOpen ? 'Hide filters' : 'Show filters'"
+              @click="sidebarOpen = !sidebarOpen"
+              class="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
-              <ViewColumnsIcon class="h-5 w-5" />
-              <span class="text-sm font-medium hidden sm:inline">
-                {{ sidebarOpen ? 'Hide' : 'Show' }} Filters
-              </span>
+              <Bars3Icon v-if="!sidebarOpen" class="h-6 w-6" />
+              <XMarkIcon v-else class="h-6 w-6" />
             </button>
-            <ConnectionStatus />
+            <img src="/mcphawk_logo.png" alt="MCPHawk Logo" class="h-[62px] ml-2 lg:ml-0">
+            <ConnectionStatus class="ml-4" />
           </div>
           <div class="flex items-center space-x-4">
             <StatsPanel />
@@ -31,26 +27,23 @@
     <div class="flex-1 flex overflow-hidden">
       <!-- Sidebar -->
       <aside
+        class="w-80 flex-shrink-0 overflow-hidden transition-all duration-300 lg:relative lg:translate-x-0"
         :class="[
-          'w-64 flex-shrink-0 overflow-hidden transition-all duration-300',
-          windowWidth < 1024 
-            ? 'fixed inset-y-0 left-0 z-40' 
-            : 'relative',
-          sidebarOpen 
-            ? 'translate-x-0' 
-            : '-translate-x-full lg:hidden'
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+          'fixed inset-y-0 left-0 z-40 lg:static lg:inset-auto'
         ]"
       >
-        <div class="h-full lg:h-full" :class="{'mt-16': true, 'lg:mt-0': true}">
+        <div class="h-full" style="margin-top: 65px;" class="lg:mt-0">
           <LogFiltersSidebar />
         </div>
       </aside>
 
       <!-- Mobile sidebar backdrop -->
       <div
-        v-if="sidebarOpen && windowWidth < 1024"
+        v-if="sidebarOpen"
         @click="sidebarOpen = false"
-        class="fixed inset-0 bg-black/50 z-30 mt-16"
+        class="lg:hidden fixed inset-0 bg-black/50 z-30"
+        style="margin-top: 65px;"
       ></div>
 
       <!-- Main Content -->
@@ -85,22 +78,11 @@ import LogFiltersSidebar from '@/components/LogTable/LogFiltersSidebar.vue'
 import LogSearchBar from '@/components/LogTable/LogSearchBar.vue'
 import LogTable from '@/components/LogTable/LogTable.vue'
 import MessageDetailModal from '@/components/MessageDetail/MessageDetailModal.vue'
-import { ViewColumnsIcon } from '@heroicons/vue/24/outline'
+import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const logStore = useLogStore()
 const wsStore = useWebSocketStore()
-const sidebarOpen = ref(true) // Default to open on desktop
-const windowWidth = ref(window.innerWidth)
-
-// Handle window resize
-const handleResize = () => {
-  windowWidth.value = window.innerWidth
-}
-
-// Toggle sidebar
-const toggleSidebar = () => {
-  sidebarOpen.value = !sidebarOpen.value
-}
+const sidebarOpen = ref(false)
 
 onMounted(() => {
   // Load initial logs
@@ -108,14 +90,9 @@ onMounted(() => {
   
   // Connect WebSocket
   wsStore.connect()
-  
-  // Add resize listener
-  window.addEventListener('resize', handleResize)
-  handleResize() // Initial check
 })
 
 onUnmounted(() => {
   wsStore.disconnect()
-  window.removeEventListener('resize', handleResize)
 })
 </script>
