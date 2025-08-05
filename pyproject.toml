@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcphawk"
-version = "0.3.4"
+version = "0.4.0"
 description = "A passive MCP (Model Context Protocol) traffic sniffer for WebSocket-based MCP servers."
 authors = [
   { name = "Your Name", email = "you@example.com" }
