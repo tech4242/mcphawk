@@ -96,7 +96,7 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.debug(f"WebSocket disconnected: {len(active_clients)} active clients")
 
 
-def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False, debug: bool = False, excluded_ports: Optional[list[int]] = None, mcphawk_mcp_ports: Optional[list[int]] = None):
+def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False, debug: bool = False, excluded_ports: Optional[list[int]] = None):
     """
     Start the sniffer in a dedicated daemon thread.
 
@@ -105,19 +105,18 @@ def _start_sniffer_thread(filter_expr: str, auto_detect: bool = False, debug: bo
         auto_detect: Whether to auto-detect MCP traffic.
         debug: Whether to enable debug logging.
         excluded_ports: List of ports to exclude from capture.
-        mcphawk_mcp_ports: List of ports where MCPHawk's own MCP server is running.
     """
     from mcphawk.sniffer import start_sniffer
 
     def safe_start():
         logger.debug(f"Sniffer thread starting with filter: {filter_expr}, auto_detect: {auto_detect}")
-        return start_sniffer(filter_expr=filter_expr, auto_detect=auto_detect, debug=debug, excluded_ports=excluded_ports, mcphawk_mcp_ports=mcphawk_mcp_ports)
+        return start_sniffer(filter_expr=filter_expr, auto_detect=auto_detect, debug=debug, excluded_ports=excluded_ports)
 
     thread = threading.Thread(target=safe_start, daemon=True)
     thread.start()
 
 
-def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: Optional[str] = None, auto_detect: bool = False, debug: bool = False, excluded_ports: Optional[list[int]] = None, with_mcp: bool = False, mcphawk_mcp_ports: Optional[list[int]] = None):
+def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, filter_expr: Optional[str] = None, auto_detect: bool = False, debug: bool = False, excluded_ports: Optional[list[int]] = None, with_mcp: bool = False):
     """
     Run the web server and optionally the sniffer.
 
@@ -133,26 +132,31 @@ def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, fil
     global _with_mcp
     _with_mcp = with_mcp
 
-    if sniffer:
-        if not filter_expr:
-            raise ValueError("filter_expr is required when sniffer is enabled")
-        _start_sniffer_thread(filter_expr, auto_detect, debug, excluded_ports, mcphawk_mcp_ports)
-
-    if sniffer:
-        print(f"[MCPHawk] Starting sniffer and dashboard on http://{host}:{port}")
-        print(f"[MCPHawk] Using filter: {filter_expr}")
-        if auto_detect:
-            print("[MCPHawk] Auto-detect mode enabled")
-    else:
-        print(f"[MCPHawk] Starting dashboard only (no sniffer) on http://{host}:{port}")
-
-    # Configure logging based on debug flag
+    # Configure logging based on debug flag first
     if debug:
         logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
         logger.setLevel(logging.DEBUG)
+        log_level = "debug"
+    else:
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
+        logger.setLevel(logging.INFO)
+        log_level = "warning"  # Only show warnings and errors for uvicorn
+
+    if sniffer:
+        if not filter_expr:
+            raise ValueError("filter_expr is required when sniffer is enabled")
+        _start_sniffer_thread(filter_expr, auto_detect, debug, excluded_ports)
+
+    if sniffer:
+        logger.info(f"Starting sniffer and dashboard on http://{host}:{port}")
+        logger.info(f"Using filter: {filter_expr}")
+        if auto_detect:
+            logger.info("Auto-detect mode enabled")
+    else:
+        logger.info(f"Starting dashboard only (no sniffer) on http://{host}:{port}")
 
     import uvicorn
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=host, port=port, log_level=log_level)
 
 
 # Serve static Vue dashboard (production mode)

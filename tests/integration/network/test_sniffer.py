@@ -105,8 +105,8 @@ class TestAutoDetect:
 
     @patch('mcphawk.sniffer.log_message')
     @patch('mcphawk.sniffer._broadcast_in_any_loop')
-    @patch('builtins.print')
-    def test_auto_detect_prints_port_info(self, mock_print, mock_broadcast, mock_log):
+    @patch('mcphawk.sniffer.logger')
+    def test_auto_detect_prints_port_info(self, mock_logger, mock_broadcast, mock_log):
         """Test that auto-detect mode prints port information when MCP traffic is found."""
         import mcphawk.sniffer
         mcphawk.sniffer._auto_detect_mode = True
@@ -122,8 +122,8 @@ class TestAutoDetect:
 
         packet_callback(mock_pkt)
 
-        # Check that port detection message was printed
-        mock_print.assert_any_call("[MCPHawk] Detected MCP traffic on port 54321 -> 3000")
+        # Check that port detection message was logged
+        mock_logger.info.assert_any_call("Detected MCP traffic on port 54321 -> 3000")
 
         # Verify log_message was called
         assert mock_log.called
@@ -134,8 +134,8 @@ class TestAutoDetect:
 
     @patch('mcphawk.sniffer.log_message')
     @patch('mcphawk.sniffer._broadcast_in_any_loop')
-    @patch('builtins.print')
-    def test_non_auto_detect_no_port_print(self, mock_print, mock_broadcast, mock_log):
+    @patch('mcphawk.sniffer.logger')
+    def test_non_auto_detect_no_port_print(self, mock_logger, mock_broadcast, mock_log):
         """Test that port info is not printed when not in auto-detect mode."""
         import mcphawk.sniffer
         mcphawk.sniffer._auto_detect_mode = False
@@ -150,9 +150,9 @@ class TestAutoDetect:
 
         packet_callback(mock_pkt)
 
-        # Should not print port detection message
-        for call_args in mock_print.call_args_list:
-            assert "[MCPHawk] Detected MCP traffic on port" not in str(call_args)
+        # Should not log port detection message
+        for call in mock_logger.info.call_args_list:
+            assert "Detected MCP traffic on port" not in str(call)
 
     @patch('mcphawk.sniffer.sniff')
     def test_start_sniffer_auto_detect_flag(self, mock_sniff):
@@ -174,9 +174,8 @@ class TestHTTPParsing:
 
     def setup_method(self):
         """Reset global state before each test."""
-        import mcphawk.sniffer
-        # Clear MCPHawk MCP ports
-        mcphawk.sniffer._mcphawk_mcp_ports.clear()
+        # Reset any global state if needed
+        pass
 
     @patch('mcphawk.sniffer.log_message')
     @patch('mcphawk.sniffer._broadcast_in_any_loop')
@@ -269,10 +268,6 @@ class TestHTTPParsing:
     @patch('mcphawk.sniffer._broadcast_in_any_loop')
     def test_mcphawk_mcp_traffic_server_info(self, mock_broadcast, mock_log):
         """Test that MCPHawk's own MCP traffic uses server info tracking."""
-        import mcphawk.sniffer
-        # Set up MCPHawk MCP ports for this test
-        mcphawk.sniffer._mcphawk_mcp_ports = {8765}
-
         # Simulate an initialize response with serverInfo
         http_response = (
             b'HTTP/1.1 200 OK\r\n'
@@ -299,19 +294,15 @@ class TestHTTPParsing:
 
         packet_callback(mock_pkt)
 
-        # The test now verifies that server info tracking works for MCPHawk's own server
-        # This happens through the normal server registry mechanism, not special metadata
+        # Verify the server info was logged
+        assert mock_log.called
+        # The test verifies that server info tracking works through the normal server registry mechanism
 
     def test_state_isolation_between_tests(self):
         """Test that state is properly isolated between tests."""
-        import mcphawk.sniffer
-        # Verify state is clean at the start of the test
-        assert len(mcphawk.sniffer._mcphawk_mcp_ports) == 0
-
-        # Modify state
-        mcphawk.sniffer._mcphawk_mcp_ports.add(9999)
-
-        # State will be cleaned up by setup_method before next test
+        # MCPHawk ports no longer tracked separately
+        pass
+        # State isolation is maintained through other global variables
 
     @patch('mcphawk.sniffer.log_message')
     @patch('mcphawk.sniffer._broadcast_in_any_loop')

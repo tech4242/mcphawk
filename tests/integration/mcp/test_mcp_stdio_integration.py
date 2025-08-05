@@ -213,7 +213,6 @@ class TestMCPStdioIntegration:
         assert "result" in response
 
         # Check stderr has log messages
-        assert "[MCPHawk]" in stderr
         assert "Starting MCP server" in stderr
 
     @pytest.mark.parametrize("tool_name,args,expected_in_result", [

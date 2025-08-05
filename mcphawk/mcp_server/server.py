@@ -9,7 +9,6 @@ from mcp.server.fastmcp import FastMCP
 from .. import logger as mcphawk_logger
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

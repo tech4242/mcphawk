@@ -38,7 +38,7 @@ def sniff(
     # Configure logging - clear existing handlers first
     logger.handlers.clear()
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
@@ -69,18 +69,12 @@ def sniff(
     # Start MCP server if requested
     mcp_thread = None
     excluded_ports = []
-    mcphawk_mcp_ports = []
     if with_mcp:
         server = MCPHawkServer()
 
         if mcp_transport == "http":
             logger.info(f"Starting MCP HTTP server on http://localhost:{mcp_port}/mcp")
-            # Only exclude MCP port if not in debug mode
-            if not debug:
-                excluded_ports = [mcp_port]
-            else:
-                logger.info("Debug mode: HTTP MCP traffic will be captured and tagged")
-                mcphawk_mcp_ports = [mcp_port]
+            # MCPHawk's own MCP traffic will be captured and identified by server name
             def run_mcp():
                 asyncio.run(server.run_http(port=mcp_port))
         else:
@@ -101,8 +95,7 @@ def sniff(
             filter_expr=filter_expr,
             auto_detect=auto_detect,
             debug=debug,
-            excluded_ports=excluded_ports,
-            mcphawk_mcp_ports=mcphawk_mcp_ports
+            excluded_ports=excluded_ports
         )
     except KeyboardInterrupt:
         logger.info("Sniffer stopped.")
@@ -126,7 +119,7 @@ def web(
     # Configure logging - clear existing handlers first
     logger.handlers.clear()
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
@@ -155,18 +148,12 @@ def web(
     # Start MCP server if requested
     mcp_thread = None
     excluded_ports = []
-    mcphawk_mcp_ports = []
     if with_mcp:
         server = MCPHawkServer()
 
         if mcp_transport == "http":
             logger.info(f"Starting MCP HTTP server on http://localhost:{mcp_port}/mcp")
-            # Only exclude MCP port if not in debug mode
-            if not debug:
-                excluded_ports = [mcp_port]
-            else:
-                logger.info("Debug mode: HTTP MCP traffic will be captured and tagged")
-                mcphawk_mcp_ports = [mcp_port]
+            # MCPHawk's own MCP traffic will be captured and identified by server name
             def run_mcp():
                 asyncio.run(server.run_http(port=mcp_port))
         else:
@@ -187,8 +174,7 @@ def web(
         auto_detect=auto_detect,
         debug=debug,
         excluded_ports=excluded_ports,
-        with_mcp=with_mcp,
-        mcphawk_mcp_ports=mcphawk_mcp_ports
+        with_mcp=with_mcp
     )
 
 
@@ -208,7 +194,7 @@ def mcp(
         # For other transports, use stdout
         handler = logging.StreamHandler(sys.stdout)
 
-    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
@@ -270,7 +256,7 @@ def wrap(
     # Configure logging
     logger.handlers.clear()
     handler = logging.StreamHandler(sys.stderr)  # Use stderr to avoid interfering with stdio
-    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
