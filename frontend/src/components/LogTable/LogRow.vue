@@ -60,8 +60,84 @@
       </div>
       <!-- Expanded JSON view -->
       <div v-if="isExpanded" class="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+        <!-- Message metadata -->
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Date:</span>
+              <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
+                {{ formatDate(log.timestamp) }}
+              </span>
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Time:</span>
+              <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
+                {{ formatTimestamp(log.timestamp) }}
+              </span>
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Type:</span>
+              <MessageTypeBadge :type="messageType" class="ml-2" />
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Message ID:</span>
+              <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
+                {{ messageId }}
+              </span>
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Server:</span>
+              <span v-if="serverInfo" class="ml-2 text-gray-900 dark:text-gray-100">
+                {{ serverInfo.name }} <span class="text-gray-500 dark:text-gray-400">v{{ serverInfo.version }}</span>
+              </span>
+              <span v-else class="ml-2 text-gray-500 dark:text-gray-400">-</span>
+            </div>
+            <div v-if="clientInfo">
+              <span class="text-gray-500 dark:text-gray-400">Client:</span>
+              <span class="ml-2 text-gray-900 dark:text-gray-100">
+                {{ clientInfo.name }} <span class="text-gray-500 dark:text-gray-400">v{{ clientInfo.version }}</span>
+              </span>
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Transport:</span>
+              <span 
+                class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                :class="transportTypeColor"
+              >
+                {{ formattedTransportType }}
+              </span>
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Direction:</span>
+              <span class="ml-2 text-gray-900 dark:text-gray-100">
+                {{ log.src_ip }} {{ directionIcon }} {{ log.dst_ip }}
+              </span>
+            </div>
+            <div v-if="log.src_port || log.dst_port">
+              <span class="text-gray-500 dark:text-gray-400">Ports:</span>
+              <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
+                {{ portInfo }}
+              </span>
+            </div>
+            <div v-if="log.pid">
+              <span class="text-gray-500 dark:text-gray-400">PID:</span>
+              <span class="ml-2 font-mono text-gray-900 dark:text-gray-100">
+                {{ log.pid }}
+              </span>
+            </div>
+            <div v-if="log.log_id">
+              <span class="text-gray-500 dark:text-gray-400">Log ID:</span>
+              <span class="ml-2 font-mono text-gray-900 dark:text-gray-100 text-xs">
+                {{ log.log_id }}
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- JSON content -->
         <div class="px-4 py-3">
-          <pre class="text-xs font-mono text-gray-800 dark:text-gray-200 overflow-x-auto">{{ formattedJson }}</pre>
+          <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">JSON-RPC Message:</div>
+          <pre class="text-xs font-mono text-gray-800 dark:text-gray-200 overflow-x-auto bg-gray-100 dark:bg-gray-800 p-3 rounded">{{ formattedJson }}</pre>
         </div>
         
         <!-- Paired messages -->
@@ -153,6 +229,22 @@ const serverInfo = computed(() => {
       return {
         name: meta.server_name,
         version: meta.server_version || ''
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null
+})
+
+const clientInfo = computed(() => {
+  if (!props.log.metadata) return null
+  try {
+    const meta = JSON.parse(props.log.metadata)
+    if (meta.client_name) {
+      return {
+        name: meta.client_name,
+        version: meta.client_version || ''
       }
     }
   } catch {
