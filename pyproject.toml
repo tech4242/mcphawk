@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcphawk"
-version = "0.3.0"
+version = "0.3.4"
 description = "A passive MCP (Model Context Protocol) traffic sniffer for WebSocket-based MCP servers."
 authors = [
   { name = "Your Name", email = "you@example.com" }
@@ -29,7 +29,11 @@ dependencies = [
 mcphawk = "mcphawk.cli:app"
 
 [tool.setuptools]
-packages = ["mcphawk", "mcphawk.web"]
+packages = {find = {where = ["."], include = ["mcphawk*"]}}
+include-package-data = true
+
+[tool.setuptools.package-data]
+"mcphawk.web" = ["static/**/*", "static/*", "static/assets/*"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories
