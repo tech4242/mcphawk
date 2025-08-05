@@ -132,26 +132,31 @@ def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, fil
     global _with_mcp
     _with_mcp = with_mcp
 
+    # Configure logging based on debug flag first
+    if debug:
+        logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
+        logger.setLevel(logging.DEBUG)
+        log_level = "debug"
+    else:
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
+        logger.setLevel(logging.INFO)
+        log_level = "warning"  # Only show warnings and errors for uvicorn
+
     if sniffer:
         if not filter_expr:
             raise ValueError("filter_expr is required when sniffer is enabled")
         _start_sniffer_thread(filter_expr, auto_detect, debug, excluded_ports)
 
     if sniffer:
-        print(f"[MCPHawk] Starting sniffer and dashboard on http://{host}:{port}")
-        print(f"[MCPHawk] Using filter: {filter_expr}")
+        logger.info(f"Starting sniffer and dashboard on http://{host}:{port}")
+        logger.info(f"Using filter: {filter_expr}")
         if auto_detect:
-            print("[MCPHawk] Auto-detect mode enabled")
+            logger.info("Auto-detect mode enabled")
     else:
-        print(f"[MCPHawk] Starting dashboard only (no sniffer) on http://{host}:{port}")
-
-    # Configure logging based on debug flag
-    if debug:
-        logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
-        logger.setLevel(logging.DEBUG)
+        logger.info(f"Starting dashboard only (no sniffer) on http://{host}:{port}")
 
     import uvicorn
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=host, port=port, log_level=log_level)
 
 
 # Serve static Vue dashboard (production mode)

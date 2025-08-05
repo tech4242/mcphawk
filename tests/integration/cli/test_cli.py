@@ -145,7 +145,7 @@ def test_sniff_with_mcp_http():
         ])
 
         # Check MCP server startup message
-        assert "[MCPHawk] Starting MCP HTTP server on http://localhost:8765/mcp" in result.stdout
+        assert "Starting MCP HTTP server on http://localhost:8765/mcp" in result.stdout
 
         # Verify thread was started for MCP server
         mock_thread.assert_called_once()
@@ -171,7 +171,7 @@ def test_sniff_with_mcp_stdio():
         ])
 
         # Check MCP server startup message
-        assert "[MCPHawk] Starting MCP server on stdio" in result.stdout
+        assert "Starting MCP server on stdio" in result.stdout
 
         # Verify sniffer was called with empty excluded ports
         mock_start_sniffer.assert_called_once()
@@ -194,7 +194,7 @@ def test_web_with_mcp_http():
         ])
 
         # Check MCP server startup message
-        assert "[MCPHawk] Starting MCP HTTP server on http://localhost:8766/mcp" in result.stdout
+        assert "Starting MCP HTTP server on http://localhost:8766/mcp" in result.stdout
 
         # Verify web was called with excluded ports
         mock_run_web.assert_called_once()
@@ -241,7 +241,7 @@ def test_sniff_with_mcp_custom_port():
         ])
 
         # Check MCP server startup message with custom port
-        assert "[MCPHawk] Starting MCP HTTP server on http://localhost:7777/mcp" in result.stdout
+        assert "Starting MCP HTTP server on http://localhost:7777/mcp" in result.stdout
 
         # Verify thread was started for MCP server
         mock_thread.assert_called_once()
@@ -287,7 +287,7 @@ def test_web_with_mcp_default_vs_custom_port():
             "--mcp-transport", "http"
         ])
 
-        assert "[MCPHawk] Starting MCP HTTP server on http://localhost:8765/mcp" in result.stdout
+        assert "Starting MCP HTTP server on http://localhost:8765/mcp" in result.stdout
         call_args = mock_run_web.call_args[1]
         assert call_args['excluded_ports'] == []
 
@@ -305,7 +305,7 @@ def test_web_with_mcp_default_vs_custom_port():
             "--mcp-port", "5555"
         ])
 
-        assert "[MCPHawk] Starting MCP HTTP server on http://localhost:5555/mcp" in result.stdout
+        assert "Starting MCP HTTP server on http://localhost:5555/mcp" in result.stdout
         call_args = mock_run_web.call_args[1]
         assert call_args['excluded_ports'] == []
 
@@ -317,8 +317,8 @@ def test_sniff_command_with_port(mock_start_sniffer):
 
     result = runner.invoke(app, ["sniff", "--port", "3000"])
     assert result.exit_code == 0
-    assert "[MCPHawk] Starting sniffer with filter: tcp port 3000" in result.stdout
-    assert "[MCPHawk] Sniffer stopped." in result.stdout
+    assert "Starting sniffer with filter: tcp port 3000" in result.stdout
+    assert "Sniffer stopped." in result.stdout
     mock_start_sniffer.assert_called_once_with(filter_expr="tcp port 3000", auto_detect=False, debug=False, excluded_ports=[])
 
 
@@ -329,7 +329,7 @@ def test_sniff_command_custom_filter(mock_start_sniffer):
 
     result = runner.invoke(app, ["sniff", "--filter", "tcp port 8080"])
     assert result.exit_code == 0
-    assert "[MCPHawk] Starting sniffer with filter: tcp port 8080" in result.stdout
+    assert "Starting sniffer with filter: tcp port 8080" in result.stdout
     mock_start_sniffer.assert_called_once_with(filter_expr="tcp port 8080", auto_detect=False, debug=False, excluded_ports=[])
 
 
@@ -340,8 +340,8 @@ def test_sniff_command_auto_detect(mock_start_sniffer):
 
     result = runner.invoke(app, ["sniff", "--auto-detect"])
     assert result.exit_code == 0
-    assert "[MCPHawk] Auto-detect mode: monitoring all TCP traffic for MCP messages" in result.stdout
-    assert "[MCPHawk] Starting sniffer with filter: tcp" in result.stdout
+    assert "Auto-detect mode: monitoring all TCP traffic for MCP messages" in result.stdout
+    assert "Starting sniffer with filter: tcp" in result.stdout
     mock_start_sniffer.assert_called_once_with(filter_expr="tcp", auto_detect=True, debug=False, excluded_ports=[])
 
 

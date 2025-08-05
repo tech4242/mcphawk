@@ -13,8 +13,6 @@ from .transport_detector import (
 )
 
 logger = logging.getLogger(__name__)
-# Ensure we're using the same log level as the parent
-logger.setLevel(logging.DEBUG)
 
 
 class StreamKey:

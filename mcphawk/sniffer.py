@@ -154,7 +154,7 @@ def packet_callback(pkt):
                     "stdio": "stdio",
                     "unknown": "Unknown"
                 }.get(transport, "Unknown")
-                print(f"[MCPHawk] Detected {transport_name} MCP traffic on port {msg_info['src_port']} -> {msg_info['dst_port']}")
+                logger.info(f"Detected {transport_name} MCP traffic on port {msg_info['src_port']} -> {msg_info['dst_port']}")
 
     if pkt.haslayer(Raw):
         raw_payload = pkt[Raw].load
@@ -218,7 +218,7 @@ def packet_callback(pkt):
 
                 # In auto-detect mode, log when we find MCP traffic on a new port
                 if _auto_detect_mode:
-                    print(f"[MCPHawk] Detected MCP traffic on port {src_port} -> {dst_port}")
+                    logger.info(f"Detected MCP traffic on port {src_port} -> {dst_port}")
 
                 # Get IP addresses
                 if pkt.haslayer(IP):

@@ -38,7 +38,7 @@ def sniff(
     # Configure logging - clear existing handlers first
     logger.handlers.clear()
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
@@ -119,7 +119,7 @@ def web(
     # Configure logging - clear existing handlers first
     logger.handlers.clear()
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
@@ -194,7 +194,7 @@ def mcp(
         # For other transports, use stdout
         handler = logging.StreamHandler(sys.stdout)
 
-    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
@@ -256,7 +256,7 @@ def wrap(
     # Configure logging
     logger.handlers.clear()
     handler = logging.StreamHandler(sys.stderr)  # Use stderr to avoid interfering with stdio
-    handler.setFormatter(logging.Formatter('[MCPHawk] %(message)s'))
+    handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
