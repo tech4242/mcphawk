@@ -47,9 +47,6 @@ _auto_detect_mode = False
 # Global variable to track excluded ports
 _excluded_ports = set()
 
-# Global variable to track MCPHawk's own MCP server ports for metadata tagging
-_mcphawk_mcp_ports = set()
-
 # TCP stream reassembler for handling SSE and chunked responses
 _tcp_reassembler = TCPStreamReassembler()
 logger.info("TCP stream reassembler initialized")
@@ -302,7 +299,7 @@ def packet_callback(pkt):
             logger.debug(f"JSON decode failed: {e}")
 
 
-def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = False, debug: bool = False, excluded_ports: list[int] | None = None, mcphawk_mcp_ports: list[int] | None = None) -> None:
+def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = False, debug: bool = False, excluded_ports: list[int] | None = None) -> None:
     """
     Start sniffing packets on the appropriate interface.
     - On macOS: use `lo0`
@@ -312,13 +309,11 @@ def start_sniffer(filter_expr: str = "tcp and port 12345", auto_detect: bool = F
         filter_expr: BPF filter expression
         auto_detect: If True, automatically detect MCP traffic on any port
         debug: If True, enable debug logging
-        mcphawk_mcp_ports: List of ports where MCPHawk's own MCP server is running
-        stdio: If True, also monitor stdio for JSON-RPC messages
+        excluded_ports: List of ports to exclude from capture
     """
-    global _auto_detect_mode, _excluded_ports, _mcphawk_mcp_ports
+    global _auto_detect_mode, _excluded_ports
     _auto_detect_mode = auto_detect
     _excluded_ports = set(excluded_ports) if excluded_ports else set()
-    _mcphawk_mcp_ports = set(mcphawk_mcp_ports) if mcphawk_mcp_ports else set()
 
     # Configure logging based on debug flag
     if debug:
