@@ -15,6 +15,10 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from mcphawk.logger import log_message
+from mcphawk.stdio_server_detector_fallback import (
+    detect_server_from_command,
+    merge_server_info,
+)
 from mcphawk.web.broadcaster import broadcast_new_log
 
 logger = logging.getLogger(__name__)
@@ -30,6 +34,7 @@ class MCPWrapper:
         self.running = False
         self.server_info = None  # Track server info from initialize response
         self.client_info = None  # Track client info from initialize request
+        self.server_info_fallback = detect_server_from_command(command)  # Fallback detection
         self.stdin_thread: Optional[threading.Thread] = None
         self.stdout_thread: Optional[threading.Thread] = None
         self.stderr_thread: Optional[threading.Thread] = None
@@ -237,10 +242,11 @@ class MCPWrapper:
                 "direction": direction
             }
 
-            # Add server info if we have it
-            if self.server_info:
-                metadata["server_name"] = self.server_info["name"]
-                metadata["server_version"] = self.server_info["version"]
+            # Merge server info (protocol takes precedence over fallback)
+            merged_server_info = merge_server_info(self.server_info_fallback, self.server_info)
+            if merged_server_info:
+                metadata["server_name"] = merged_server_info["name"]
+                metadata["server_version"] = merged_server_info["version"]
 
             # Add client info if we have it
             if self.client_info:
