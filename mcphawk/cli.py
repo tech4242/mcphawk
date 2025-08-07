@@ -234,9 +234,9 @@ def mcp(
         sys.exit(0)
 
 
-@app.command()
+@app.command(context_settings={"allow_extra_args": True, "allow_interspersed_args": False})
 def wrap(
-    command: list[str] = typer.Argument(..., help="MCP server command and arguments"),
+    ctx: typer.Context,
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug output")
 ):
     """Wrap an MCP server to capture stdio traffic transparently.
@@ -253,16 +253,18 @@ def wrap(
             "command": "mcphawk",
             "args": ["wrap", "/path/to/mcp-server", "--arg1", "--arg2"]
     """
+    # Get the command from remaining args
+    command = ctx.args
+    if not command:
+        logger.error("No command specified to wrap")
+        raise typer.Exit(1)
+    
     # Configure logging
     logger.handlers.clear()
     handler = logging.StreamHandler(sys.stderr)  # Use stderr to avoid interfering with stdio
     handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
-
-    if not command:
-        logger.error("No command specified to wrap")
-        raise typer.Exit(1)
 
     logger.info(f"Starting MCP wrapper for: {' '.join(command)}")
 
