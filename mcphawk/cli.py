@@ -258,7 +258,7 @@ def wrap(
     if not command:
         logger.error("No command specified to wrap")
         raise typer.Exit(1)
-    
+
     # Configure logging
     logger.handlers.clear()
     handler = logging.StreamHandler(sys.stderr)  # Use stderr to avoid interfering with stdio
