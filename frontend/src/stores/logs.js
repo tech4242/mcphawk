@@ -6,10 +6,10 @@ import { parseMessage, getMessageType } from '@/utils/messageParser'
 export const useLogStore = defineStore('logs', () => {
   // State
   const logs = ref([])
-  const filter = ref('all')
+  const filter = ref(['all']) // Changed to array for multi-select
   const searchQuery = ref('')
-  const transportFilter = ref('all')
-  const serverFilter = ref('all')
+  const transportFilter = ref(['all']) // Changed to array for multi-select
+  const serverFilter = ref(['all']) // Changed to array for multi-select
   const showPairing = ref(false)
   const selectedLogId = ref(null)
   const loading = ref(false)
@@ -21,28 +21,28 @@ export const useLogStore = defineStore('logs', () => {
     let result = logs.value
 
     // Apply type filter
-    if (filter.value !== 'all') {
+    if (!filter.value.includes('all') && filter.value.length > 0) {
       result = result.filter(log => {
         const msgType = getMessageType(log.message)
-        return msgType === filter.value
+        return filter.value.includes(msgType)
       })
     }
 
     // Apply transport filter
-    if (transportFilter.value !== 'all') {
+    if (!transportFilter.value.includes('all') && transportFilter.value.length > 0) {
       result = result.filter(log => {
         const transport = log.transport_type || log.traffic_type || 'unknown'
-        return transport === transportFilter.value
+        return transportFilter.value.includes(transport)
       })
     }
 
     // Apply server filter
-    if (serverFilter.value !== 'all') {
+    if (!serverFilter.value.includes('all') && serverFilter.value.length > 0) {
       result = result.filter(log => {
         if (!log.metadata) return false
         try {
           const meta = JSON.parse(log.metadata)
-          return meta.server_name === serverFilter.value
+          return serverFilter.value.includes(meta.server_name)
         } catch {
           return false
         }
@@ -156,7 +156,13 @@ export const useLogStore = defineStore('logs', () => {
   }
 
   function setFilter(newFilter) {
-    filter.value = newFilter
+    // Handle both array and single value for backward compatibility
+    if (Array.isArray(newFilter)) {
+      filter.value = newFilter
+    } else {
+      // Single value - convert to array
+      filter.value = newFilter === 'all' ? ['all'] : [newFilter]
+    }
   }
 
   function setSearchQuery(query) {
@@ -172,11 +178,23 @@ export const useLogStore = defineStore('logs', () => {
   }
 
   function setTransportFilter(transport) {
-    transportFilter.value = transport
+    // Handle both array and single value for backward compatibility
+    if (Array.isArray(transport)) {
+      transportFilter.value = transport
+    } else {
+      // Single value - convert to array
+      transportFilter.value = transport === 'all' ? ['all'] : [transport]
+    }
   }
 
-  function setServerFilter(server) {
-    serverFilter.value = server
+  function setServerFilter(servers) {
+    // Handle both array and single value for backward compatibility
+    if (Array.isArray(servers)) {
+      serverFilter.value = servers
+    } else {
+      // Single value - convert to array
+      serverFilter.value = servers === 'all' ? ['all'] : [servers]
+    }
   }
 
   return {

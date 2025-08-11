@@ -6,6 +6,7 @@
         <div class="flex items-center justify-between h-16">
           <div class="flex items-center space-x-4">
             <img src="/mcphawk_logo.png" alt="MCPHawk Logo" class="h-[62px]">
+            <ConnectionStatus />
             <div class="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
             
             <!-- Navigation Tabs -->
@@ -52,19 +53,6 @@
                 </button>
               </RouterLink>
             </nav>
-            
-            <div class="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
-            <button
-              @click="toggleSidebar"
-              class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
-              :title="sidebarOpen ? 'Hide filters' : 'Show filters'"
-            >
-              <ViewColumnsIcon class="h-5 w-5" />
-              <span class="text-sm font-medium hidden sm:inline">
-                {{ sidebarOpen ? 'Hide' : 'Show' }} Filters
-              </span>
-            </button>
-            <ConnectionStatus />
           </div>
           <div class="flex items-center space-x-4">
             <ThemeToggle />

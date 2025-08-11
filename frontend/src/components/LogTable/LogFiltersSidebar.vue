@@ -28,95 +28,74 @@
       <!-- Server Section (Always shown, at top) -->
       <div v-if="logStore.uniqueServers.length > 0">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Server</h3>
-        <div class="space-y-2">
-          <label
-            class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200"
-            :class="[
-              selectedServer === 'all'
-                ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 border border-mcp-blue/30'
-                : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent'
-            ]"
-          >
-            <input
-              type="radio"
-              name="server"
-              value="all"
-              :checked="selectedServer === 'all'"
-              @change="updateServer('all')"
-              class="sr-only"
+        <Listbox v-model="selectedServers" multiple>
+          <div class="relative">
+            <ListboxButton
+              class="relative w-full cursor-pointer rounded-lg bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-mcp-blue focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-mcp-blue-light sm:text-sm"
             >
-            <div class="flex items-center flex-1">
-              <div
-                class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
-                :class="[
-                  selectedServer === 'all'
-                    ? 'border-mcp-blue bg-mcp-blue'
-                    : 'border-gray-400 dark:border-gray-500'
-                ]"
-              >
-                <div
-                  v-if="selectedServer === 'all'"
-                  class="w-2 h-2 rounded-full bg-white"
-                ></div>
-              </div>
-              <span
-                class="text-sm font-medium"
-                :class="[
-                  selectedServer === 'all'
-                    ? 'text-mcp-blue dark:text-mcp-blue-light'
-                    : 'text-gray-700 dark:text-gray-300'
-                ]"
-              >
-                All Servers
+              <span class="block truncate text-gray-900 dark:text-gray-100">
+                {{ selectedServersDisplay }}
               </span>
-            </div>
-          </label>
-          <label
-            v-for="server in logStore.uniqueServers"
-            :key="server"
-            class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200"
-            :class="[
-              selectedServer === server
-                ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 border border-mcp-blue/30'
-                : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent'
-            ]"
-          >
-            <input
-              type="radio"
-              name="server"
-              :value="server"
-              :checked="selectedServer === server"
-              @change="updateServer(server)"
-              class="sr-only"
+              <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                <ChevronUpDownIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
+              </span>
+            </ListboxButton>
+
+            <transition
+              leave-active-class="transition duration-100 ease-in"
+              leave-from-class="opacity-100"
+              leave-to-class="opacity-0"
             >
-            <div class="flex items-center flex-1">
-              <div
-                class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
-                :class="[
-                  selectedServer === server
-                    ? 'border-mcp-blue bg-mcp-blue'
-                    : 'border-gray-400 dark:border-gray-500'
-                ]"
+              <ListboxOptions
+                class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
               >
-                <div
-                  v-if="selectedServer === server"
-                  class="w-2 h-2 rounded-full bg-white"
-                ></div>
-              </div>
-              <span
-                class="text-sm font-medium truncate"
-                :class="[
-                  selectedServer === server
-                    ? 'text-mcp-blue dark:text-mcp-blue-light'
-                    : 'text-gray-700 dark:text-gray-300'
-                ]"
-                :title="server"
-              >
-                {{ server }}
-              </span>
-            </div>
-          </label>
-        </div>
+                <ListboxOption
+                  key="all"
+                  :value="'all'"
+                  v-slot="{ active, selected }"
+                  as="template"
+                >
+                  <li
+                    :class="[
+                      active ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 text-mcp-blue' : 'text-gray-900 dark:text-gray-100',
+                      'relative cursor-pointer select-none py-2 pl-10 pr-4',
+                    ]"
+                    @click="handleAllServersClick"
+                  >
+                    <span :class="[selectedServers.includes('all') ? 'font-medium' : 'font-normal', 'block truncate']">
+                      All Servers
+                    </span>
+                    <span v-if="selectedServers.includes('all')" class="absolute inset-y-0 left-0 flex items-center pl-3 text-mcp-blue">
+                      <CheckIcon class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                  </li>
+                </ListboxOption>
+
+                <ListboxOption
+                  v-for="server in logStore.uniqueServers"
+                  :key="server"
+                  :value="server"
+                  v-slot="{ active, selected }"
+                  as="template"
+                >
+                  <li
+                    :class="[
+                      active ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 text-mcp-blue' : 'text-gray-900 dark:text-gray-100',
+                      'relative cursor-pointer select-none py-2 pl-10 pr-4',
+                    ]"
+                  >
+                    <span :class="[selectedServers.includes(server) ? 'font-medium' : 'font-normal', 'block truncate']">
+                      {{ server }}
+                    </span>
+                    <span v-if="selectedServers.includes(server)" class="absolute inset-y-0 left-0 flex items-center pl-3 text-mcp-blue">
+                      <CheckIcon class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                  </li>
+                </ListboxOption>
+              </ListboxOptions>
+            </transition>
+          </div>
+        </Listbox>
       </div>
 
       <!-- Time Range Section (Analytics only) -->
@@ -124,13 +103,13 @@
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Time Range</h3>
         <div class="space-y-3">
           <!-- Quick Range Buttons -->
-          <div class="grid grid-cols-2 gap-2">
+          <div class="flex flex-wrap gap-2">
             <button
               v-for="range in quickRanges"
               :key="range.label"
               @click="selectQuickRange(range)"
               :class="[
-                'px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200',
+                'px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200',
                 selectedRange === range.label
                   ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
                   : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -178,115 +157,110 @@
       <!-- Message Type Section (Logs only) -->
       <div v-if="!isAnalyticsView">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Message Type</h3>
-        <div class="space-y-2">
-          <label
-            v-for="filterOption in typeFilters"
-            :key="filterOption.value"
-            class="flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200"
-            :class="[
-              logStore.filter === filterOption.value
-                ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 border border-mcp-blue/30'
-                : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent'
-            ]"
-          >
-            <div class="flex items-center">
-              <input
-                type="radio"
-                :name="'message-type'"
-                :value="filterOption.value"
-                :checked="logStore.filter === filterOption.value"
-                @change="logStore.setFilter(filterOption.value)"
-                class="sr-only"
-              >
-              <div class="flex items-center">
-                <div
-                  class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
-                  :class="[
-                    logStore.filter === filterOption.value
-                      ? 'border-mcp-blue bg-mcp-blue'
-                      : 'border-gray-400 dark:border-gray-500'
-                  ]"
-                >
-                  <div
-                    v-if="logStore.filter === filterOption.value"
-                    class="w-2 h-2 rounded-full bg-white"
-                  ></div>
-                </div>
-                <span
-                  class="text-sm font-medium"
-                  :class="[
-                    logStore.filter === filterOption.value
-                      ? 'text-mcp-blue dark:text-mcp-blue-light'
-                      : 'text-gray-700 dark:text-gray-300'
-                  ]"
-                >
-                  {{ filterOption.label }}
-                </span>
-              </div>
-            </div>
-            <span
-              class="text-sm"
-              :class="[
-                logStore.filter === filterOption.value
-                  ? 'text-mcp-blue dark:text-mcp-blue-light font-semibold'
-                  : 'text-gray-500 dark:text-gray-400'
-              ]"
+        <Listbox v-model="selectedMessageTypes" multiple>
+          <div class="relative">
+            <ListboxButton
+              class="relative w-full cursor-pointer rounded-lg bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-mcp-blue focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-mcp-blue-light sm:text-sm"
             >
-              {{ formatCount(filterOption.count) }}
-            </span>
-          </label>
-        </div>
+              <span class="block truncate text-gray-900 dark:text-gray-100">
+                {{ selectedMessageTypesDisplay }}
+              </span>
+              <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                <ChevronUpDownIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
+              </span>
+            </ListboxButton>
+
+            <transition
+              leave-active-class="transition duration-100 ease-in"
+              leave-from-class="opacity-100"
+              leave-to-class="opacity-0"
+            >
+              <ListboxOptions
+                class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+              >
+                <ListboxOption
+                  v-for="filterOption in typeFilters"
+                  :key="filterOption.value"
+                  :value="filterOption.value"
+                  v-slot="{ active, selected }"
+                  as="template"
+                >
+                  <li
+                    :class="[
+                      active ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 text-mcp-blue' : 'text-gray-900 dark:text-gray-100',
+                      'relative cursor-pointer select-none py-2 pl-10 pr-4',
+                    ]"
+                    @click="filterOption.value === 'all' ? handleAllMessageTypesClick() : null"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span :class="[selectedMessageTypes.includes(filterOption.value) ? 'font-medium' : 'font-normal', 'block truncate']">
+                        {{ filterOption.label }}
+                      </span>
+                      <span class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ formatCount(filterOption.count) }}
+                      </span>
+                    </div>
+                    <span v-if="selectedMessageTypes.includes(filterOption.value)" class="absolute inset-y-0 left-0 flex items-center pl-3 text-mcp-blue">
+                      <CheckIcon class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                  </li>
+                </ListboxOption>
+              </ListboxOptions>
+            </transition>
+          </div>
+        </Listbox>
       </div>
 
       <!-- Transport Type Section -->
       <div>
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Transport Type</h3>
-        <div class="space-y-2">
-          <label
-            v-for="transport in transportOptions"
-            :key="transport.value"
-            class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200"
-            :class="[
-              selectedTransport === transport.value
-                ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 border border-mcp-blue/30'
-                : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent'
-            ]"
-          >
-            <input
-              type="radio"
-              :name="'transport-type'"
-              :value="transport.value"
-              :checked="selectedTransport === transport.value"
-              @change="updateTransport(transport.value)"
-              class="sr-only"
+        <Listbox v-model="selectedTransport" multiple>
+          <div class="relative">
+            <ListboxButton
+              class="relative w-full cursor-pointer rounded-lg bg-white dark:bg-gray-700 py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-mcp-blue focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-mcp-blue-light sm:text-sm"
             >
-            <div class="flex items-center flex-1">
-              <div
-                class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
-                :class="[
-                  selectedTransport === transport.value
-                    ? 'border-mcp-blue bg-mcp-blue'
-                    : 'border-gray-400 dark:border-gray-500'
-                ]"
-              >
-                <div
-                  v-if="selectedTransport === transport.value"
-                  class="w-2 h-2 rounded-full bg-white"
-                ></div>
-              </div>
-              <span
-                class="text-sm font-medium"
-                :class="[
-                  selectedTransport === transport.value
-                    ? 'text-mcp-blue dark:text-mcp-blue-light'
-                    : 'text-gray-700 dark:text-gray-300'
-                ]"
-              >
-                {{ transport.label }}
+              <span class="block truncate text-gray-900 dark:text-gray-100">
+                {{ selectedTransportDisplay }}
               </span>
-            </div>
-          </label>
-        </div>
+              <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                <ChevronUpDownIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
+              </span>
+            </ListboxButton>
+
+            <transition
+              leave-active-class="transition duration-100 ease-in"
+              leave-from-class="opacity-100"
+              leave-to-class="opacity-0"
+            >
+              <ListboxOptions
+                class="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm"
+              >
+                <ListboxOption
+                  v-for="transport in transportOptions"
+                  :key="transport.value"
+                  :value="transport.value"
+                  v-slot="{ active, selected }"
+                  as="template"
+                >
+                  <li
+                    :class="[
+                      active ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 text-mcp-blue' : 'text-gray-900 dark:text-gray-100',
+                      'relative cursor-pointer select-none py-2 pl-10 pr-4',
+                    ]"
+                    @click="transport.value === 'all' ? handleAllTransportsClick() : null"
+                  >
+                    <span :class="[selectedTransport.includes(transport.value) ? 'font-medium' : 'font-normal', 'block truncate']">
+                      {{ transport.label }}
+                    </span>
+                    <span v-if="selectedTransport.includes(transport.value)" class="absolute inset-y-0 left-0 flex items-center pl-3 text-mcp-blue">
+                      <CheckIcon class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                  </li>
+                </ListboxOption>
+              </ListboxOptions>
+            </transition>
+          </div>
+        </Listbox>
       </div>
     </div>
 
@@ -300,10 +274,11 @@
         Clear All Filters
       </button>
       <button
-        @click="isAnalyticsView ? analyticsStore.fetchAllMetrics() : logStore.fetchLogs()"
+        v-if="!isAnalyticsView"
+        @click="logStore.fetchLogs()"
         class="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
       >
-        <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': isAnalyticsView ? Object.values(analyticsStore.loading).some(v => v) : logStore.loading }" />
+        <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': logStore.loading }" />
         Refresh
       </button>
     </div>
@@ -315,7 +290,8 @@ import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useLogStore } from '@/stores/logs'
 import { useAnalyticsStore } from '@/stores/analytics'
-import { ArrowPathIcon, XMarkIcon, CalendarDaysIcon, ClockIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, XMarkIcon, CalendarDaysIcon, ClockIcon, ChevronUpDownIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from '@headlessui/vue'
 import VueDatePicker from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 import dayjs from 'dayjs'
@@ -324,8 +300,9 @@ const logStore = useLogStore()
 const analyticsStore = useAnalyticsStore()
 const route = useRoute()
 
-const selectedTransport = ref('all')
-const selectedServer = ref('all')
+const selectedMessageTypes = ref(['all'])
+const selectedTransport = ref(['all'])
+const selectedServers = ref(['all'])
 
 // Time range state for analytics
 const dateRange = ref([])
@@ -355,13 +332,15 @@ const transportOptions = [
 const activeFilterCount = computed(() => {
   let count = 0
   if (!isAnalyticsView.value) {
-    if (logStore.filter !== 'all') count++
-    if (logStore.transportFilter !== 'all') count++
-    if (logStore.serverFilter !== 'all') count++
+    if (!logStore.filter.includes('all') && logStore.filter.length > 0) count++
+    if (!logStore.transportFilter.includes('all') && logStore.transportFilter.length > 0) count++
+    if (!logStore.serverFilter.includes('all') && logStore.serverFilter.length > 0) count++
     if (logStore.searchQuery) count++
   } else {
-    if (logStore.transportFilter !== 'all') count++
-    if (logStore.serverFilter !== 'all') count++
+    if (!logStore.transportFilter.includes('all') && logStore.transportFilter.length > 0) count++
+    if (!logStore.serverFilter.includes('all') && logStore.serverFilter.length > 0) count++
+    // Add time range as an active filter
+    if (selectedRange.value !== 'All Data') count++
   }
   return count
 })
@@ -445,34 +424,49 @@ function onIntervalChange() {
 const activeFilters = computed(() => {
   const filters = []
   
-  if (logStore.filter !== 'all') {
-    const typeFilter = typeFilters.value.find(f => f.value === logStore.filter)
-    if (typeFilter) {
-      filters.push({
-        key: 'type',
-        type: 'type',
-        value: logStore.filter,
-        label: typeFilter.label
-      })
-    }
+  // Add time range filter for analytics view
+  if (isAnalyticsView.value && selectedRange.value && selectedRange.value !== 'All Data') {
+    filters.push({
+      key: 'timeRange',
+      type: 'timeRange',
+      value: selectedRange.value,
+      label: `Time: ${selectedRange.value}`
+    })
   }
   
-  if (logStore.transportFilter !== 'all') {
-    const transport = transportOptions.find(t => t.value === logStore.transportFilter)
+  if (!logStore.filter.includes('all') && logStore.filter.length > 0) {
+    const typeLabel = logStore.filter.length === 1 
+      ? typeFilters.value.find(f => f.value === logStore.filter[0])?.label || logStore.filter[0]
+      : `${logStore.filter.length} message types`
+    filters.push({
+      key: 'type',
+      type: 'type',
+      value: logStore.filter,
+      label: typeLabel
+    })
+  }
+  
+  if (!logStore.transportFilter.includes('all') && logStore.transportFilter.length > 0) {
+    const transportLabel = logStore.transportFilter.length === 1 
+      ? transportOptions.find(t => t.value === logStore.transportFilter[0])?.label || logStore.transportFilter[0]
+      : `${logStore.transportFilter.length} transports`
     filters.push({
       key: 'transport',
       type: 'transport',
       value: logStore.transportFilter,
-      label: transport ? transport.label : logStore.transportFilter
+      label: transportLabel
     })
   }
   
-  if (logStore.serverFilter !== 'all') {
+  if (!logStore.serverFilter.includes('all') && logStore.serverFilter.length > 0) {
+    const serverLabel = logStore.serverFilter.length === 1 
+      ? `Server: ${logStore.serverFilter[0]}`
+      : `Servers: ${logStore.serverFilter.length} selected`
     filters.push({
       key: 'server',
       type: 'server',
       value: logStore.serverFilter,
-      label: `Server: ${logStore.serverFilter}`
+      label: serverLabel
     })
   }
   
@@ -495,61 +489,225 @@ function formatCount(count) {
   return count
 }
 
-function updateTransport(value) {
-  selectedTransport.value = value
-  logStore.setTransportFilter(value)
-}
-
-function updateServer(value) {
-  selectedServer.value = value
-  logStore.setServerFilter(value)
-}
-
 function removeFilter(filter) {
   switch (filter.type) {
     case 'type':
-      logStore.setFilter('all')
+      selectedMessageTypes.value = ['all']
+      logStore.setFilter(['all'])
       break
     case 'transport':
-      selectedTransport.value = 'all'
-      logStore.setTransportFilter('all')
+      selectedTransport.value = ['all']
+      logStore.setTransportFilter(['all'])
       break
     case 'server':
-      selectedServer.value = 'all'
-      logStore.setServerFilter('all')
+      selectedServers.value = ['all']
+      logStore.setServerFilter(['all'])
       break
     case 'search':
       logStore.setSearchQuery('')
+      break
+    case 'timeRange':
+      // Reset to All Data
+      selectQuickRange({ label: 'All Data', special: 'all' })
       break
   }
 }
 
 function clearAllFilters() {
-  logStore.setFilter('all')
-  selectedTransport.value = 'all'
-  logStore.setTransportFilter('all')
-  selectedServer.value = 'all'
-  logStore.setServerFilter('all')
+  selectedMessageTypes.value = ['all']
+  logStore.setFilter(['all'])
+  selectedTransport.value = ['all']
+  logStore.setTransportFilter(['all'])
+  selectedServers.value = ['all']
+  logStore.setServerFilter(['all'])
   logStore.setSearchQuery('')
+  if (isAnalyticsView.value) {
+    selectQuickRange({ label: 'All Data', special: 'all' })
+  }
 }
 
 // Sync with store
+watch(() => logStore.filter, (value) => {
+  if (Array.isArray(value)) {
+    selectedMessageTypes.value = value
+  } else {
+    // Handle backward compatibility
+    selectedMessageTypes.value = value === 'all' ? ['all'] : [value]
+  }
+})
+
 watch(() => logStore.transportFilter, (value) => {
-  selectedTransport.value = value
+  if (Array.isArray(value)) {
+    selectedTransport.value = value
+  } else {
+    // Handle backward compatibility
+    selectedTransport.value = value === 'all' ? ['all'] : [value]
+  }
+  // Refresh analytics when filter changes
+  if (isAnalyticsView.value) {
+    analyticsStore.fetchAllMetrics()
+  }
 })
 
 watch(() => logStore.serverFilter, (value) => {
-  selectedServer.value = value
+  if (Array.isArray(value)) {
+    selectedServers.value = value
+  } else {
+    // Handle backward compatibility
+    selectedServers.value = value === 'all' ? ['all'] : [value]
+  }
+  // Refresh analytics when filter changes
+  if (isAnalyticsView.value) {
+    analyticsStore.fetchAllMetrics()
+  }
+})
+
+// Computed properties for multi-select displays
+const selectedMessageTypesDisplay = computed(() => {
+  if (selectedMessageTypes.value.includes('all')) {
+    return 'All Messages'
+  } else if (selectedMessageTypes.value.length === 0) {
+    return 'Select types...'
+  } else if (selectedMessageTypes.value.length === 1) {
+    const typeFilter = typeFilters.value.find(f => f.value === selectedMessageTypes.value[0])
+    return typeFilter ? typeFilter.label : selectedMessageTypes.value[0]
+  } else {
+    return `${selectedMessageTypes.value.length} types selected`
+  }
+})
+
+const selectedTransportDisplay = computed(() => {
+  if (selectedTransport.value.includes('all')) {
+    return 'All Transports'
+  } else if (selectedTransport.value.length === 0) {
+    return 'Select transports...'
+  } else if (selectedTransport.value.length === 1) {
+    const transport = transportOptions.find(t => t.value === selectedTransport.value[0])
+    return transport ? transport.label : selectedTransport.value[0]
+  } else {
+    return `${selectedTransport.value.length} transports selected`
+  }
+})
+
+const selectedServersDisplay = computed(() => {
+  if (selectedServers.value.includes('all')) {
+    return 'All Servers'
+  } else if (selectedServers.value.length === 0) {
+    return 'Select servers...'
+  } else if (selectedServers.value.length === 1) {
+    return selectedServers.value[0]
+  } else {
+    return `${selectedServers.value.length} servers selected`
+  }
+})
+
+// Handle "All" click for multi-select dropdowns
+function handleAllMessageTypesClick() {
+  if (selectedMessageTypes.value.includes('all')) {
+    // If "all" is already selected, deselect it
+    selectedMessageTypes.value = []
+  } else {
+    // Select only "all" and deselect everything else
+    selectedMessageTypes.value = ['all']
+  }
+}
+
+function handleAllTransportsClick() {
+  if (selectedTransport.value.includes('all')) {
+    // If "all" is already selected, deselect it
+    selectedTransport.value = []
+  } else {
+    // Select only "all" and deselect everything else
+    selectedTransport.value = ['all']
+  }
+}
+
+function handleAllServersClick() {
+  if (selectedServers.value.includes('all')) {
+    // If "all" is already selected, deselect it
+    selectedServers.value = []
+  } else {
+    // Select only "all" and deselect everything else
+    selectedServers.value = ['all']
+  }
+}
+
+// Watch multi-select arrays for changes
+watch(selectedMessageTypes, (newValue, oldValue) => {
+  // If user selects a specific type while "all" is selected, remove "all"
+  if (newValue.includes('all') && newValue.length > 1) {
+    // Check if "all" was already selected
+    if (oldValue && oldValue.includes('all')) {
+      // Remove "all" since user selected a specific type
+      selectedMessageTypes.value = newValue.filter(t => t !== 'all')
+    } else {
+      // User selected "all", so clear other selections
+      selectedMessageTypes.value = ['all']
+    }
+  }
+  
+  // Update the store
+  logStore.setFilter(selectedMessageTypes.value)
+})
+
+watch(selectedTransport, (newValue, oldValue) => {
+  // If user selects a specific transport while "all" is selected, remove "all"
+  if (newValue.includes('all') && newValue.length > 1) {
+    // Check if "all" was already selected
+    if (oldValue && oldValue.includes('all')) {
+      // Remove "all" since user selected a specific transport
+      selectedTransport.value = newValue.filter(t => t !== 'all')
+    } else {
+      // User selected "all", so clear other selections
+      selectedTransport.value = ['all']
+    }
+  }
+  
+  // Update the store
+  logStore.setTransportFilter(selectedTransport.value)
+})
+
+watch(selectedServers, (newValue, oldValue) => {
+  // If user selects a specific server while "all" is selected, remove "all"
+  if (newValue.includes('all') && newValue.length > 1) {
+    // Check if "all" was already selected
+    if (oldValue && oldValue.includes('all')) {
+      // Remove "all" since user selected a specific server
+      selectedServers.value = newValue.filter(s => s !== 'all')
+    } else {
+      // User selected "all", so clear other selections
+      selectedServers.value = ['all']
+    }
+  }
+  
+  // Update the store
+  logStore.setServerFilter(selectedServers.value)
 })
 
 // Initialize time range for analytics on mount
 onMounted(() => {
   if (isAnalyticsView.value) {
-    // Set initial date range for analytics
-    dateRange.value = [new Date('2025-08-02'), new Date('2025-08-08')]
-    updateTimeRange()
-    intervalMinutes.value = analyticsStore.timeRange.intervalMinutes
-    selectedRange.value = 'Custom Range'
+    // Set initial date range for analytics to Last 24 Hours
+    selectQuickRange({ label: 'Last 24 Hours', hours: 24 })
+  }
+  
+  // Initialize multi-select values from store
+  if (Array.isArray(logStore.filter)) {
+    selectedMessageTypes.value = logStore.filter
+  } else {
+    selectedMessageTypes.value = logStore.filter === 'all' ? ['all'] : [logStore.filter]
+  }
+  
+  if (Array.isArray(logStore.transportFilter)) {
+    selectedTransport.value = logStore.transportFilter
+  } else {
+    selectedTransport.value = logStore.transportFilter === 'all' ? ['all'] : [logStore.transportFilter]
+  }
+  
+  if (Array.isArray(logStore.serverFilter)) {
+    selectedServers.value = logStore.serverFilter
+  } else {
+    selectedServers.value = logStore.serverFilter === 'all' ? ['all'] : [logStore.serverFilter]
   }
 })
 </script>

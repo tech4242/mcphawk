@@ -34,8 +34,16 @@ export const useAnalyticsStore = defineStore('analytics', () => {
   
   // Computed
   const filters = computed(() => ({
-    transportType: logStore.transportFilter === 'all' ? undefined : logStore.transportFilter,
-    serverName: logStore.serverFilter === 'all' ? undefined : logStore.serverFilter
+    transportType: (Array.isArray(logStore.transportFilter) && logStore.transportFilter.includes('all')) || logStore.transportFilter === 'all'
+      ? undefined 
+      : Array.isArray(logStore.transportFilter) 
+        ? logStore.transportFilter.length === 1 ? logStore.transportFilter[0] : logStore.transportFilter 
+        : logStore.transportFilter,
+    serverName: (Array.isArray(logStore.serverFilter) && logStore.serverFilter.includes('all')) || logStore.serverFilter === 'all' 
+      ? undefined 
+      : Array.isArray(logStore.serverFilter) 
+        ? logStore.serverFilter.length === 1 ? logStore.serverFilter[0] : logStore.serverFilter 
+        : logStore.serverFilter
   }))
   
   const queryParams = computed(() => {
@@ -48,10 +56,26 @@ export const useAnalyticsStore = defineStore('analytics', () => {
       params.append('end_time', timeRange.value.endTime)
     }
     if (filters.value.transportType) {
-      params.append('transport_type', filters.value.transportType)
+      // Handle both single transport and multiple transports
+      if (Array.isArray(filters.value.transportType)) {
+        // For multiple transports, add each as a separate param (API may need to handle this)
+        filters.value.transportType.forEach(transport => {
+          params.append('transport_type', transport)
+        })
+      } else {
+        params.append('transport_type', filters.value.transportType)
+      }
     }
     if (filters.value.serverName) {
-      params.append('server_name', filters.value.serverName)
+      // Handle both single server and multiple servers
+      if (Array.isArray(filters.value.serverName)) {
+        // For multiple servers, add each as a separate param (API may need to handle this)
+        filters.value.serverName.forEach(server => {
+          params.append('server_name', server)
+        })
+      } else {
+        params.append('server_name', filters.value.serverName)
+      }
     }
     
     return params.toString()

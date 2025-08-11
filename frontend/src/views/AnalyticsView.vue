@@ -1,5 +1,5 @@
 <template>
-  <div class="flex-1 flex overflow-hidden">
+  <div class="flex-1 flex overflow-hidden relative">
     <!-- Sidebar -->
     <aside
       :class="[
@@ -9,13 +9,25 @@
           : 'relative',
         sidebarOpen 
           ? 'translate-x-0' 
-          : '-translate-x-full lg:hidden'
+          : '-translate-x-full'
       ]"
     >
       <div class="h-full lg:h-full" :class="{'mt-16': true, 'lg:mt-0': true}">
         <LogFiltersSidebar />
       </div>
     </aside>
+    
+    <!-- Sidebar Toggle Button -->
+    <button
+      @click="toggleSidebar"
+      :class="[
+        'absolute top-1/2 -translate-y-1/2 z-50 bg-white dark:bg-gray-800 rounded-r-lg shadow-md p-2 transition-all duration-300 hover:bg-gray-50 dark:hover:bg-gray-700',
+        sidebarOpen ? 'left-64' : 'left-0'
+      ]"
+      :title="sidebarOpen ? 'Hide filters' : 'Show filters'"
+    >
+      <ViewColumnsIcon class="h-5 w-5 text-gray-600 dark:text-gray-300" />
+    </button>
 
     <!-- Mobile sidebar backdrop -->
     <div
@@ -74,10 +86,16 @@ import MessageTypeChart from '@/components/Analytics/MessageTypeChart.vue'
 import MethodFrequency from '@/components/Analytics/MethodFrequency.vue'
 import ErrorRateChart from '@/components/Analytics/ErrorRateChart.vue'
 import PerformanceMetrics from '@/components/Analytics/PerformanceMetrics.vue'
+import { ViewColumnsIcon } from '@heroicons/vue/24/outline'
 
 const sidebarOpen = inject('sidebarOpen')
 const windowWidth = ref(window.innerWidth)
 const analyticsStore = useAnalyticsStore()
+
+// Toggle sidebar
+const toggleSidebar = () => {
+  sidebarOpen.value = !sidebarOpen.value
+}
 
 // Handle window resize
 const handleResize = () => {
