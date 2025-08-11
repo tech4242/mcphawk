@@ -73,6 +73,12 @@ def init_db() -> None:
             )
             """
         )
+        
+        # Create indexes for better query performance
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_logs_transport_type ON logs(transport_type)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_logs_timestamp_transport ON logs(timestamp, transport_type)")
+        
         conn.commit()
 
 

@@ -25,8 +25,158 @@
 
     <!-- Sidebar Content -->
     <div class="flex-1 overflow-y-auto p-4 space-y-6">
-      <!-- Message Type Section -->
-      <div>
+      <!-- Server Section (Always shown, at top) -->
+      <div v-if="logStore.uniqueServers.length > 0">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Server</h3>
+        <div class="space-y-2">
+          <label
+            class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200"
+            :class="[
+              selectedServer === 'all'
+                ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 border border-mcp-blue/30'
+                : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent'
+            ]"
+          >
+            <input
+              type="radio"
+              name="server"
+              value="all"
+              :checked="selectedServer === 'all'"
+              @change="updateServer('all')"
+              class="sr-only"
+            >
+            <div class="flex items-center flex-1">
+              <div
+                class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
+                :class="[
+                  selectedServer === 'all'
+                    ? 'border-mcp-blue bg-mcp-blue'
+                    : 'border-gray-400 dark:border-gray-500'
+                ]"
+              >
+                <div
+                  v-if="selectedServer === 'all'"
+                  class="w-2 h-2 rounded-full bg-white"
+                ></div>
+              </div>
+              <span
+                class="text-sm font-medium"
+                :class="[
+                  selectedServer === 'all'
+                    ? 'text-mcp-blue dark:text-mcp-blue-light'
+                    : 'text-gray-700 dark:text-gray-300'
+                ]"
+              >
+                All Servers
+              </span>
+            </div>
+          </label>
+          <label
+            v-for="server in logStore.uniqueServers"
+            :key="server"
+            class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200"
+            :class="[
+              selectedServer === server
+                ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 border border-mcp-blue/30'
+                : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent'
+            ]"
+          >
+            <input
+              type="radio"
+              name="server"
+              :value="server"
+              :checked="selectedServer === server"
+              @change="updateServer(server)"
+              class="sr-only"
+            >
+            <div class="flex items-center flex-1">
+              <div
+                class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
+                :class="[
+                  selectedServer === server
+                    ? 'border-mcp-blue bg-mcp-blue'
+                    : 'border-gray-400 dark:border-gray-500'
+                ]"
+              >
+                <div
+                  v-if="selectedServer === server"
+                  class="w-2 h-2 rounded-full bg-white"
+                ></div>
+              </div>
+              <span
+                class="text-sm font-medium truncate"
+                :class="[
+                  selectedServer === server
+                    ? 'text-mcp-blue dark:text-mcp-blue-light'
+                    : 'text-gray-700 dark:text-gray-300'
+                ]"
+                :title="server"
+              >
+                {{ server }}
+              </span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Time Range Section (Analytics only) -->
+      <div v-if="isAnalyticsView">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Time Range</h3>
+        <div class="space-y-3">
+          <!-- Quick Range Buttons -->
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="range in quickRanges"
+              :key="range.label"
+              @click="selectQuickRange(range)"
+              :class="[
+                'px-2 py-1.5 rounded-lg text-xs font-medium transition-all duration-200',
+                selectedRange === range.label
+                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
+              ]"
+            >
+              {{ range.label }}
+            </button>
+          </div>
+          
+          <!-- Custom Date Range -->
+          <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Custom Range:</label>
+            <VueDatePicker
+              v-model="dateRange"
+              range
+              :enable-time-picker="false"
+              :dark="isDark"
+              :format="dateFormat"
+              :preview-format="dateFormat"
+              placeholder="Select dates"
+              @update:model-value="onDateRangeChange"
+              class="w-full"
+            />
+          </div>
+          
+          <!-- Interval Selector -->
+          <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Interval:</label>
+            <select
+              v-model="intervalMinutes"
+              @change="onIntervalChange"
+              class="w-full px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option :value="1">1 minute</option>
+              <option :value="5">5 minutes</option>
+              <option :value="10">10 minutes</option>
+              <option :value="15">15 minutes</option>
+              <option :value="30">30 minutes</option>
+              <option :value="60">1 hour</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Message Type Section (Logs only) -->
+      <div v-if="!isAnalyticsView">
         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Message Type</h3>
         <div class="space-y-2">
           <label
@@ -138,120 +288,6 @@
           </label>
         </div>
       </div>
-
-      <!-- Server Section -->
-      <div v-if="logStore.uniqueServers.length > 0">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Server</h3>
-        <div class="space-y-2">
-          <label
-            class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200"
-            :class="[
-              selectedServer === 'all'
-                ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 border border-mcp-blue/30'
-                : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent'
-            ]"
-          >
-            <input
-              type="radio"
-              name="server"
-              value="all"
-              :checked="selectedServer === 'all'"
-              @change="updateServer('all')"
-              class="sr-only"
-            >
-            <div class="flex items-center flex-1">
-              <div
-                class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
-                :class="[
-                  selectedServer === 'all'
-                    ? 'border-mcp-blue bg-mcp-blue'
-                    : 'border-gray-400 dark:border-gray-500'
-                ]"
-              >
-                <div
-                  v-if="selectedServer === 'all'"
-                  class="w-2 h-2 rounded-full bg-white"
-                ></div>
-              </div>
-              <span
-                class="text-sm font-medium"
-                :class="[
-                  selectedServer === 'all'
-                    ? 'text-mcp-blue dark:text-mcp-blue-light'
-                    : 'text-gray-700 dark:text-gray-300'
-                ]"
-              >
-                All Servers
-              </span>
-            </div>
-          </label>
-          <label
-            v-for="server in logStore.uniqueServers"
-            :key="server"
-            class="flex items-center p-3 rounded-lg cursor-pointer transition-all duration-200"
-            :class="[
-              selectedServer === server
-                ? 'bg-mcp-blue/10 dark:bg-mcp-blue/20 border border-mcp-blue/30'
-                : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent'
-            ]"
-          >
-            <input
-              type="radio"
-              name="server"
-              :value="server"
-              :checked="selectedServer === server"
-              @change="updateServer(server)"
-              class="sr-only"
-            >
-            <div class="flex items-center flex-1">
-              <div
-                class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
-                :class="[
-                  selectedServer === server
-                    ? 'border-mcp-blue bg-mcp-blue'
-                    : 'border-gray-400 dark:border-gray-500'
-                ]"
-              >
-                <div
-                  v-if="selectedServer === server"
-                  class="w-2 h-2 rounded-full bg-white"
-                ></div>
-              </div>
-              <span
-                class="text-sm font-medium truncate"
-                :class="[
-                  selectedServer === server
-                    ? 'text-mcp-blue dark:text-mcp-blue-light'
-                    : 'text-gray-700 dark:text-gray-300'
-                ]"
-                :title="server"
-              >
-                {{ server }}
-              </span>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      <!-- Additional Options -->
-      <div>
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Display Options</h3>
-        <div class="space-y-3">
-          <label class="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Expand all JSON</span>
-            <button
-              @click.stop="logStore.toggleExpandAll"
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-              :class="logStore.expandAll ? 'bg-mcp-blue' : 'bg-gray-300 dark:bg-gray-600'"
-            >
-              <span
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                :class="logStore.expandAll ? 'translate-x-6' : 'translate-x-1'"
-              />
-            </button>
-          </label>
-        </div>
-      </div>
     </div>
 
     <!-- Sidebar Footer -->
@@ -264,10 +300,10 @@
         Clear All Filters
       </button>
       <button
-        @click="logStore.fetchLogs()"
+        @click="isAnalyticsView ? analyticsStore.fetchAllMetrics() : logStore.fetchLogs()"
         class="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
       >
-        <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': logStore.loading }" />
+        <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': isAnalyticsView ? Object.values(analyticsStore.loading).some(v => v) : logStore.loading }" />
         Refresh
       </button>
     </div>
@@ -275,14 +311,30 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useLogStore } from '@/stores/logs'
-import { ArrowPathIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { useAnalyticsStore } from '@/stores/analytics'
+import { ArrowPathIcon, XMarkIcon, CalendarDaysIcon, ClockIcon } from '@heroicons/vue/24/outline'
+import VueDatePicker from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
+import dayjs from 'dayjs'
 
 const logStore = useLogStore()
+const analyticsStore = useAnalyticsStore()
+const route = useRoute()
 
 const selectedTransport = ref('all')
 const selectedServer = ref('all')
+
+// Time range state for analytics
+const dateRange = ref([])
+const selectedRange = ref('Last Hour')
+const intervalMinutes = ref(5)
+
+// Computed properties
+const isAnalyticsView = computed(() => route.name === 'analytics')
+const isDark = computed(() => document.documentElement.classList.contains('dark'))
 
 const typeFilters = computed(() => [
   { label: 'All Messages', value: 'all', count: logStore.stats.total },
@@ -302,12 +354,93 @@ const transportOptions = [
 
 const activeFilterCount = computed(() => {
   let count = 0
-  if (logStore.filter !== 'all') count++
-  if (logStore.transportFilter !== 'all') count++
-  if (logStore.serverFilter !== 'all') count++
-  if (logStore.searchQuery) count++
+  if (!isAnalyticsView.value) {
+    if (logStore.filter !== 'all') count++
+    if (logStore.transportFilter !== 'all') count++
+    if (logStore.serverFilter !== 'all') count++
+    if (logStore.searchQuery) count++
+  } else {
+    if (logStore.transportFilter !== 'all') count++
+    if (logStore.serverFilter !== 'all') count++
+  }
   return count
 })
+
+// Time range functions for analytics
+const quickRanges = [
+  { label: 'All Data', special: 'all' },
+  { label: 'Last Hour', hours: 1 },
+  { label: 'Last 6 Hours', hours: 6 },
+  { label: 'Last 24 Hours', hours: 24 },
+  { label: 'Last 7 Days', days: 7 },
+  { label: 'Last 30 Days', days: 30 }
+]
+
+const dateFormat = (dates) => {
+  if (!dates) return ''
+  if (Array.isArray(dates)) {
+    const start = dayjs(dates[0]).format('MMM D, YYYY')
+    const end = dates[1] ? dayjs(dates[1]).format('MMM D, YYYY') : ''
+    return end ? `${start} - ${end}` : start
+  }
+  return dayjs(dates).format('MMM D, YYYY')
+}
+
+function selectQuickRange(range) {
+  selectedRange.value = range.label
+  
+  if (range.special === 'all') {
+    dateRange.value = []
+    analyticsStore.setTimeRange(null, null)
+    return
+  }
+  
+  const now = new Date()
+  let start
+  
+  if (range.hours) {
+    start = new Date(now.getTime() - range.hours * 60 * 60 * 1000)
+  } else if (range.days) {
+    start = new Date(now.getTime() - range.days * 24 * 60 * 60 * 1000)
+  }
+  
+  dateRange.value = [start, now]
+  updateTimeRange()
+}
+
+function onDateRangeChange() {
+  selectedRange.value = null
+  updateTimeRange()
+}
+
+function updateTimeRange() {
+  if (dateRange.value && dateRange.value.length === 2) {
+    const [start, end] = dateRange.value
+    
+    const rangeDays = dayjs(end).diff(dayjs(start), 'day')
+    if (rangeDays > 30) {
+      intervalMinutes.value = 60 * 24
+    } else if (rangeDays > 7) {
+      intervalMinutes.value = 60 * 6
+    } else if (rangeDays > 2) {
+      intervalMinutes.value = 60
+    } else if (rangeDays > 0) {
+      intervalMinutes.value = 15
+    } else {
+      intervalMinutes.value = 5
+    }
+    
+    analyticsStore.setIntervalMinutes(intervalMinutes.value)
+    analyticsStore.setTimeRange(
+      start.toISOString(),
+      end.toISOString()
+    )
+  }
+}
+
+function onIntervalChange() {
+  analyticsStore.setIntervalMinutes(intervalMinutes.value)
+}
 
 const activeFilters = computed(() => {
   const filters = []
@@ -408,4 +541,32 @@ watch(() => logStore.transportFilter, (value) => {
 watch(() => logStore.serverFilter, (value) => {
   selectedServer.value = value
 })
+
+// Initialize time range for analytics on mount
+onMounted(() => {
+  if (isAnalyticsView.value) {
+    // Set initial date range for analytics
+    dateRange.value = [new Date('2025-08-02'), new Date('2025-08-08')]
+    updateTimeRange()
+    intervalMinutes.value = analyticsStore.timeRange.intervalMinutes
+    selectedRange.value = 'Custom Range'
+  }
+})
 </script>
+
+<style>
+/* Custom styles for the date picker in dark mode */
+.dp__theme_dark {
+  --dp-background-color: rgb(31 41 55);
+  --dp-text-color: rgb(209 213 219);
+  --dp-hover-color: rgb(55 65 81);
+  --dp-hover-text-color: #ffffff;
+  --dp-hover-icon-color: #959595;
+  --dp-primary-color: rgb(59 130 246);
+  --dp-primary-text-color: #ffffff;
+  --dp-secondary-color: rgb(107 114 128);
+  --dp-border-color: rgb(75 85 99);
+  --dp-menu-border-color: rgb(75 85 99);
+  --dp-border-color-hover: rgb(107 114 128);
+}
+</style>

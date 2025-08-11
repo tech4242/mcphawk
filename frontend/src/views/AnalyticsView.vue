@@ -1,0 +1,97 @@
+<template>
+  <div class="flex-1 flex overflow-hidden">
+    <!-- Sidebar -->
+    <aside
+      :class="[
+        'w-64 flex-shrink-0 overflow-hidden transition-all duration-300',
+        windowWidth < 1024 
+          ? 'fixed inset-y-0 left-0 z-40' 
+          : 'relative',
+        sidebarOpen 
+          ? 'translate-x-0' 
+          : '-translate-x-full lg:hidden'
+      ]"
+    >
+      <div class="h-full lg:h-full" :class="{'mt-16': true, 'lg:mt-0': true}">
+        <LogFiltersSidebar />
+      </div>
+    </aside>
+
+    <!-- Mobile sidebar backdrop -->
+    <div
+      v-if="sidebarOpen && windowWidth < 1024"
+      @click="sidebarOpen = false"
+      class="fixed inset-0 bg-black/50 z-30 mt-16"
+    ></div>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900">
+      <div class="px-4 sm:px-6 lg:px-8 py-6">
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Performance Metrics (Top Left) -->
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            <PerformanceMetrics />
+          </div>
+
+          <!-- Method Frequency (Top Right) -->
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            <MethodFrequency />
+          </div>
+
+          <!-- Request/Response Time Series -->
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 lg:col-span-2">
+            <RequestResponseChart />
+          </div>
+
+          <!-- Transport Distribution -->
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            <TransportDistribution />
+          </div>
+
+          <!-- Message Type Distribution -->
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            <MessageTypeChart />
+          </div>
+
+          <!-- Error Rate Timeline -->
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 lg:col-span-2">
+            <ErrorRateChart />
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</template>
+
+<script setup>
+import { inject, onMounted, onUnmounted, ref } from 'vue'
+import { useAnalyticsStore } from '@/stores/analytics'
+import LogFiltersSidebar from '@/components/LogTable/LogFiltersSidebar.vue'
+import RequestResponseChart from '@/components/Analytics/RequestResponseChart.vue'
+import TransportDistribution from '@/components/Analytics/TransportDistribution.vue'
+import MessageTypeChart from '@/components/Analytics/MessageTypeChart.vue'
+import MethodFrequency from '@/components/Analytics/MethodFrequency.vue'
+import ErrorRateChart from '@/components/Analytics/ErrorRateChart.vue'
+import PerformanceMetrics from '@/components/Analytics/PerformanceMetrics.vue'
+
+const sidebarOpen = inject('sidebarOpen')
+const windowWidth = ref(window.innerWidth)
+const analyticsStore = useAnalyticsStore()
+
+// Handle window resize
+const handleResize = () => {
+  windowWidth.value = window.innerWidth
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize)
+  handleResize() // Initial check
+  
+  // Don't fetch here - TimeRangeSelector will do it after setting the date range
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
+</script>

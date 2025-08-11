@@ -7,6 +7,53 @@
           <div class="flex items-center space-x-4">
             <img src="/mcphawk_logo.png" alt="MCPHawk Logo" class="h-[62px]">
             <div class="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
+            
+            <!-- Navigation Tabs -->
+            <nav class="flex space-x-1">
+              <RouterLink
+                to="/"
+                v-slot="{ isActive }"
+                custom
+              >
+                <button
+                  @click="$router.push('/')"
+                  :class="[
+                    'px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ]"
+                >
+                  <div class="flex items-center gap-2">
+                    <TableCellsIcon class="h-4 w-4" />
+                    <span>Logs</span>
+                  </div>
+                </button>
+              </RouterLink>
+              
+              <RouterLink
+                to="/analytics"
+                v-slot="{ isActive }"
+                custom
+              >
+                <button
+                  @click="$router.push('/analytics')"
+                  :class="[
+                    'px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ]"
+                >
+                  <div class="flex items-center gap-2">
+                    <ChartBarIcon class="h-4 w-4" />
+                    <span>Analytics</span>
+                  </div>
+                </button>
+              </RouterLink>
+            </nav>
+            
+            <div class="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
             <button
               @click="toggleSidebar"
               class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
@@ -20,54 +67,14 @@
             <ConnectionStatus />
           </div>
           <div class="flex items-center space-x-4">
-            <StatsPanel />
             <ThemeToggle />
           </div>
         </div>
       </div>
     </header>
 
-    <!-- Main Content Area -->
-    <div class="flex-1 flex overflow-hidden">
-      <!-- Sidebar -->
-      <aside
-        :class="[
-          'w-64 flex-shrink-0 overflow-hidden transition-all duration-300',
-          windowWidth < 1024 
-            ? 'fixed inset-y-0 left-0 z-40' 
-            : 'relative',
-          sidebarOpen 
-            ? 'translate-x-0' 
-            : '-translate-x-full lg:hidden'
-        ]"
-      >
-        <div class="h-full lg:h-full" :class="{'mt-16': true, 'lg:mt-0': true}">
-          <LogFiltersSidebar />
-        </div>
-      </aside>
-
-      <!-- Mobile sidebar backdrop -->
-      <div
-        v-if="sidebarOpen && windowWidth < 1024"
-        @click="sidebarOpen = false"
-        class="fixed inset-0 bg-black/50 z-30 mt-16"
-      ></div>
-
-      <!-- Main Content -->
-      <main class="flex-1 overflow-auto">
-        <div class="px-4 sm:px-6 lg:px-8 py-6">
-          <!-- Search Bar and Actions -->
-          <div class="mb-6">
-            <LogSearchBar />
-          </div>
-
-          <!-- Log Table -->
-          <div class="bg-white dark:bg-gray-800 shadow-xl rounded-xl overflow-hidden">
-            <LogTable />
-          </div>
-        </div>
-      </main>
-    </div>
+    <!-- Router View -->
+    <RouterView />
 
     <!-- Message Detail Modal -->
     <MessageDetailModal />
@@ -75,27 +82,21 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, provide, ref } from 'vue'
+import { RouterView, RouterLink } from 'vue-router'
 import { useLogStore } from '@/stores/logs'
 import { useWebSocketStore } from '@/stores/websocket'
 import ConnectionStatus from '@/components/common/ConnectionStatus.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
-import StatsPanel from '@/components/Stats/StatsPanel.vue'
-import LogFiltersSidebar from '@/components/LogTable/LogFiltersSidebar.vue'
-import LogSearchBar from '@/components/LogTable/LogSearchBar.vue'
-import LogTable from '@/components/LogTable/LogTable.vue'
 import MessageDetailModal from '@/components/MessageDetail/MessageDetailModal.vue'
-import { ViewColumnsIcon } from '@heroicons/vue/24/outline'
+import { ViewColumnsIcon, TableCellsIcon, ChartBarIcon } from '@heroicons/vue/24/outline'
 
 const logStore = useLogStore()
 const wsStore = useWebSocketStore()
 const sidebarOpen = ref(true) // Default to open on desktop
-const windowWidth = ref(window.innerWidth)
 
-// Handle window resize
-const handleResize = () => {
-  windowWidth.value = window.innerWidth
-}
+// Provide sidebar state to child components
+provide('sidebarOpen', sidebarOpen)
 
 // Toggle sidebar
 const toggleSidebar = () => {
@@ -108,14 +109,9 @@ onMounted(() => {
   
   // Connect WebSocket
   wsStore.connect()
-  
-  // Add resize listener
-  window.addEventListener('resize', handleResize)
-  handleResize() // Initial check
 })
 
 onUnmounted(() => {
   wsStore.disconnect()
-  window.removeEventListener('resize', handleResize)
 })
 </script>

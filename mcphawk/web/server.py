@@ -2,15 +2,24 @@ import asyncio
 import logging
 import os
 import threading
+from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from mcphawk.logger import fetch_logs
 from mcphawk.web.broadcaster import active_clients
+from mcphawk.web.metrics import (
+    get_error_timeline,
+    get_message_type_distribution,
+    get_method_frequency,
+    get_performance_metrics,
+    get_timeseries_metrics,
+    get_transport_distribution,
+)
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -61,6 +70,96 @@ def get_logs(limit: int = 50):
         }
         for log in logs
     ])
+
+
+@app.get("/api/metrics/timeseries")
+def get_timeseries(
+    start_time: Optional[datetime] = Query(None),  # noqa: B008
+    end_time: Optional[datetime] = Query(None),  # noqa: B008
+    interval_minutes: int = Query(5, ge=1, le=60),  # noqa: B008
+    transport_type: Optional[str] = Query(None),  # noqa: B008
+    server_name: Optional[str] = Query(None),  # noqa: B008
+):
+    """Get time series metrics for message traffic."""
+    return get_timeseries_metrics(
+        start_time=start_time,
+        end_time=end_time,
+        interval_minutes=interval_minutes,
+        transport_type=transport_type,
+        server_name=server_name,
+    )
+
+
+@app.get("/api/metrics/methods")
+def get_methods(
+    start_time: Optional[datetime] = Query(None),  # noqa: B008
+    end_time: Optional[datetime] = Query(None),  # noqa: B008
+    limit: int = Query(20, ge=1, le=100),  # noqa: B008
+    transport_type: Optional[str] = Query(None),  # noqa: B008
+    server_name: Optional[str] = Query(None),  # noqa: B008
+):
+    """Get frequency of JSON-RPC methods."""
+    return get_method_frequency(
+        start_time=start_time,
+        end_time=end_time,
+        limit=limit,
+        transport_type=transport_type,
+        server_name=server_name,
+    )
+
+
+@app.get("/api/metrics/transport")
+def get_transport(
+    start_time: Optional[datetime] = Query(None),  # noqa: B008
+    end_time: Optional[datetime] = Query(None),  # noqa: B008
+):
+    """Get distribution of messages by transport type."""
+    return get_transport_distribution(
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+
+@app.get("/api/metrics/message-types")
+def get_message_types(
+    start_time: Optional[datetime] = Query(None),  # noqa: B008
+    end_time: Optional[datetime] = Query(None),  # noqa: B008
+    transport_type: Optional[str] = Query(None),  # noqa: B008
+):
+    """Get distribution of messages by type."""
+    return get_message_type_distribution(
+        start_time=start_time,
+        end_time=end_time,
+        transport_type=transport_type,
+    )
+
+
+@app.get("/api/metrics/performance")
+def get_performance(
+    start_time: Optional[datetime] = Query(None),  # noqa: B008
+    end_time: Optional[datetime] = Query(None),  # noqa: B008
+    transport_type: Optional[str] = Query(None),  # noqa: B008
+):
+    """Get performance metrics including response times."""
+    return get_performance_metrics(
+        start_time=start_time,
+        end_time=end_time,
+        transport_type=transport_type,
+    )
+
+
+@app.get("/api/metrics/errors")
+def get_errors(
+    start_time: Optional[datetime] = Query(None),  # noqa: B008
+    end_time: Optional[datetime] = Query(None),  # noqa: B008
+    interval_minutes: int = Query(5, ge=1, le=60),  # noqa: B008
+):
+    """Get timeline of errors."""
+    return get_error_timeline(
+        start_time=start_time,
+        end_time=end_time,
+        interval_minutes=interval_minutes,
+    )
 
 
 @app.websocket("/ws")
@@ -162,4 +261,19 @@ def run_web(sniffer: bool = True, host: str = "127.0.0.1", port: int = 8000, fil
 # Serve static Vue dashboard (production mode)
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
+    # Mount static files first for assets
+    assets_dir = os.path.join(static_dir, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    
+    # Add specific route for analytics to serve index.html
+    @app.get("/analytics")
+    async def serve_analytics():
+        """Serve index.html for the /analytics route."""
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        return JSONResponse(content={"detail": "Not Found"}, status_code=404)
+    
+    # Mount root static files with html=True for other routes
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
