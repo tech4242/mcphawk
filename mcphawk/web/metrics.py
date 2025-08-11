@@ -32,7 +32,7 @@ def get_timeseries_metrics(
         Time series data with counts by message type
     """
     logger.debug(f"get_timeseries_metrics called with start_time={start_time}, end_time={end_time}")
-    
+
     # If no time range specified, get the full range from database
     if not start_time or not end_time:
         with get_db_connection() as conn:

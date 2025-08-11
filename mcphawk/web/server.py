@@ -7,7 +7,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from mcphawk.logger import fetch_logs
@@ -76,9 +76,9 @@ def get_logs(limit: int = 50):
 def get_timeseries(
     start_time: Optional[datetime] = Query(None),  # noqa: B008
     end_time: Optional[datetime] = Query(None),  # noqa: B008
-    interval_minutes: int = Query(5, ge=1, le=60),  # noqa: B008
-    transport_type: Optional[str] = Query(None),  # noqa: B008
-    server_name: Optional[str] = Query(None),  # noqa: B008
+    interval_minutes: int = Query(5, ge=1, le=60),
+    transport_type: Optional[str] = Query(None),
+    server_name: Optional[str] = Query(None),
 ):
     """Get time series metrics for message traffic."""
     return get_timeseries_metrics(
@@ -94,9 +94,9 @@ def get_timeseries(
 def get_methods(
     start_time: Optional[datetime] = Query(None),  # noqa: B008
     end_time: Optional[datetime] = Query(None),  # noqa: B008
-    limit: int = Query(20, ge=1, le=100),  # noqa: B008
-    transport_type: Optional[str] = Query(None),  # noqa: B008
-    server_name: Optional[str] = Query(None),  # noqa: B008
+    limit: int = Query(20, ge=1, le=100),
+    transport_type: Optional[str] = Query(None),
+    server_name: Optional[str] = Query(None),
 ):
     """Get frequency of JSON-RPC methods."""
     return get_method_frequency(
@@ -124,7 +124,7 @@ def get_transport(
 def get_message_types(
     start_time: Optional[datetime] = Query(None),  # noqa: B008
     end_time: Optional[datetime] = Query(None),  # noqa: B008
-    transport_type: Optional[str] = Query(None),  # noqa: B008
+    transport_type: Optional[str] = Query(None),
 ):
     """Get distribution of messages by type."""
     return get_message_type_distribution(
@@ -138,7 +138,7 @@ def get_message_types(
 def get_performance(
     start_time: Optional[datetime] = Query(None),  # noqa: B008
     end_time: Optional[datetime] = Query(None),  # noqa: B008
-    transport_type: Optional[str] = Query(None),  # noqa: B008
+    transport_type: Optional[str] = Query(None),
 ):
     """Get performance metrics including response times."""
     return get_performance_metrics(
@@ -152,7 +152,7 @@ def get_performance(
 def get_errors(
     start_time: Optional[datetime] = Query(None),  # noqa: B008
     end_time: Optional[datetime] = Query(None),  # noqa: B008
-    interval_minutes: int = Query(5, ge=1, le=60),  # noqa: B008
+    interval_minutes: int = Query(5, ge=1, le=60),
 ):
     """Get timeline of errors."""
     return get_error_timeline(
@@ -265,7 +265,7 @@ if os.path.exists(static_dir):
     assets_dir = os.path.join(static_dir, "assets")
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
-    
+
     # Add specific route for analytics to serve index.html
     @app.get("/analytics")
     async def serve_analytics():
@@ -274,6 +274,6 @@ if os.path.exists(static_dir):
         if os.path.exists(index_path):
             return FileResponse(index_path)
         return JSONResponse(content={"detail": "Not Found"}, status_code=404)
-    
+
     # Mount root static files with html=True for other routes
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")

@@ -186,16 +186,22 @@ class TestTimeseriesMetrics:
             assert "notifications" in bucket
             assert "errors" in bucket
 
-            # Verify counts based on mock data
-            if bucket["requests"] > 0:
-                assert bucket["requests"] == 2  # initialize and tools/list
-            if bucket["responses"] > 0:
-                assert bucket["responses"] == 2  # Two responses
-            if bucket["notifications"] > 0:
-                assert bucket["notifications"] == 1  # One notification
-            if bucket["errors"] > 0:
-                # Error is counted both as type and from error field
-                assert bucket["errors"] >= 1  # At least one error response
+            # Verify counts are non-negative (actual values depend on bucket boundaries)
+            assert bucket["requests"] >= 0
+            assert bucket["responses"] >= 0
+            assert bucket["notifications"] >= 0
+            assert bucket["errors"] >= 0
+
+        # Verify total counts across all buckets match the mock data
+        total_requests = sum(b["requests"] for b in result["data"])
+        total_responses = sum(b["responses"] for b in result["data"])
+        total_notifications = sum(b["notifications"] for b in result["data"])
+        total_errors = sum(b["errors"] for b in result["data"])
+
+        assert total_requests == 2  # initialize and tools/list
+        assert total_responses == 2  # Two responses
+        assert total_notifications == 1  # One notification
+        assert total_errors >= 1  # At least one error response
 
 
 class TestMethodFrequency:
@@ -224,17 +230,15 @@ class TestMethodFrequency:
         mock_cursor = MagicMock()
 
         # Add duplicate method to test sorting
-        test_rows = mock_db_rows + [
-            {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "message": json.dumps({
-                    "jsonrpc": "2.0",
-                    "method": "initialize",
-                    "params": {},
-                    "id": 10
-                })
-            }
-        ]
+        test_rows = [*mock_db_rows, {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "message": json.dumps({
+                "jsonrpc": "2.0",
+                "method": "initialize",
+                "params": {},
+                "id": 10
+            })
+        }]
 
         mock_cursor.fetchone.return_value = {
             "min_ts": test_rows[0]["timestamp"],
