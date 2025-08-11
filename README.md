@@ -198,8 +198,6 @@ MCPHawk includes a built-in MCP server, allowing you to query captured traffic t
 - **Automated Monitoring**: Build agents that detect anomalies or specific behaviors
 - **Integration Testing**: Programmatically verify MCP interactions in CI/CD pipelines
 
-<img src="examples/branding/mcphawk_claudedesktop.png" alt="MCPHawk Claude Desktop MCP" width="100%">
-
 ### Available Tools
 
 The MCP server exposes these tools for traffic analysis:
@@ -214,7 +212,7 @@ The MCP server exposes these tools for traffic analysis:
 
 ### Transport Options
 
-#### HTTP Transport (Development & Testing)
+#### HTTP Transport
 
 The HTTP transport uses Server-Sent Events (SSE) for streaming responses:
 
@@ -232,7 +230,7 @@ curl -N -X POST http://localhost:8765/mcp \
 # data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05",...}}
 ```
 
-#### stdio Transport (Production & Claude Desktop)
+#### stdio Transport
 
 For Claude Desktop integration:
 
@@ -246,14 +244,6 @@ For Claude Desktop integration:
   }
 }
 ```
-
-The stdio transport follows the standard MCP communication pattern:
-1. Client sends `initialize` request
-2. Server responds with capabilities
-3. Client sends `initialized` notification
-4. Normal tool calls can proceed
-
-See [examples/mcp_sdk_client.py](examples/mcp_sdk_client.py) for HTTP client example or [examples/stdio_client.py](examples/stdio_client.py) for stdio communication.
 
 ## Platform Support
 
@@ -297,6 +287,7 @@ Vote for features by opening a GitHub issue!
 - [x] **Auto-detect MCP traffic** - Automatically discover MCP traffic on any port without prior configuration
 - [x] **MCP Server Interface** - Expose captured traffic via MCP server for AI agents to query and analyze traffic patterns
 - [x] **Stdio capture** - Transparent process wrapper to capture stdin/stdout communication
+- [ ] **Support for Open Telemetry** - Get the data on the road
 - [ ] **Protocol Version Detection** - Identify and display MCP protocol version from captured traffic
 - [ ] **Smart Search & Filtering** - Search by method name, params, or any JSON field with regex support
 - [ ] **Performance Analytics** - Request/response timing, method frequency charts, and latency distribution
