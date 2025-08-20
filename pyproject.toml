@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcphawk"
-version = "0.4.1"
-description = "A passive MCP (Model Context Protocol) traffic sniffer for WebSocket-based MCP servers."
+version = "0.4.2"
+description = "MCPHawk is a Logging & Monitoring solution for MCP traffic, providing deep visibility into MCP client-server interactions"
 authors = [
   { name = "tech4242" }
 ]
