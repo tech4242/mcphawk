@@ -34,16 +34,15 @@ class TestMCPHawkApp:
         """Test that the app starts correctly."""
         app = MCPHawkApp()
         async with app.run_test():
-            # App should have a MainScreen
-            main_screen = app.query_one(MainScreen)
-            assert main_screen is not None
+            # App should have a MainScreen as the current screen
+            assert isinstance(app.screen, MainScreen)
 
     @pytest.mark.asyncio
     async def test_app_has_log_table(self, mock_db_connection):
         """Test that app contains a log table."""
         app = MCPHawkApp()
         async with app.run_test():
-            table = app.query_one(LogDataTable)
+            table = app.screen.query_one(LogDataTable)
             assert table is not None
 
     @pytest.mark.asyncio
@@ -51,7 +50,7 @@ class TestMCPHawkApp:
         """Test that app contains a stats bar."""
         app = MCPHawkApp()
         async with app.run_test():
-            stats_bar = app.query_one(StatsBar)
+            stats_bar = app.screen.query_one(StatsBar)
             assert stats_bar is not None
 
     @pytest.mark.asyncio
@@ -59,7 +58,7 @@ class TestMCPHawkApp:
         """Test that app contains a filter panel."""
         app = MCPHawkApp()
         async with app.run_test():
-            filter_panel = app.query_one(FilterPanel)
+            filter_panel = app.screen.query_one(FilterPanel)
             assert filter_panel is not None
 
     @pytest.mark.asyncio
@@ -75,7 +74,8 @@ class TestMCPHawkApp:
         """Test that f key toggles filter panel."""
         app = MCPHawkApp()
         async with app.run_test() as pilot:
-            main_screen = app.query_one(MainScreen)
+            main_screen = app.screen
+            assert isinstance(main_screen, MainScreen)
             initial_visible = main_screen.filter_visible
 
             await pilot.press("f")
@@ -104,7 +104,8 @@ class TestMainScreen:
         """Test clear action resets the log table."""
         app = MCPHawkApp()
         async with app.run_test() as pilot:
-            main_screen = app.query_one(MainScreen)
+            main_screen = app.screen
+            assert isinstance(main_screen, MainScreen)
 
             # Add a test entry manually
             entry = LogEntry(

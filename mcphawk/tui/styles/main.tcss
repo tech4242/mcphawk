@@ -1,5 +1,15 @@
 /* MCPHawk TUI Styles */
 
+/* Welcome screen */
+#welcome-container {
+    height: 1fr;
+    width: 100%;
+}
+
+#welcome-banner {
+    padding: 2 4;
+}
+
 /* Main layout */
 #main-container {
     height: 1fr;
@@ -27,10 +37,11 @@
 }
 
 #status-bar {
-    height: 1;
-    padding: 0 1;
+    height: 3;
+    padding: 1;
     background: $surface;
     border-top: solid $primary-darken-2;
+    text-align: center;
 }
 
 /* Filter panel */

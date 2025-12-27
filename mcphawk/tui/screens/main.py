@@ -9,9 +9,19 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Static
 
 from mcphawk.tui.data.log_manager import LogManager
+from mcphawk.tui.logo import LOGO
 from mcphawk.tui.widgets.filter_panel import FilterPanel
 from mcphawk.tui.widgets.log_table import LogDataTable
 from mcphawk.tui.widgets.stats_bar import StatsBar
+
+WELCOME_MESSAGE = f"""{LOGO}
+[dim]Press [bold]q[/] to quit • [bold]f[/] to toggle filters • [bold]/[/] to search[/]
+
+[bold cyan]Getting Started:[/]
+  [dim]•[/] Run [bold green]mcphawk sniff --port 3000[/] to capture HTTP traffic
+  [dim]•[/] Run [bold green]mcphawk wrap /path/to/server[/] to capture stdio traffic
+  [dim]•[/] Traffic will appear here automatically
+"""
 
 
 class MainScreen(Screen):
@@ -32,6 +42,10 @@ class MainScreen(Screen):
         """Compose the main screen layout."""
         yield Header()
 
+        # Welcome banner (shown when no data)
+        yield Static(WELCOME_MESSAGE, id="welcome-banner", markup=True)
+
+        # Main content (hidden initially)
         with Horizontal(id="main-container"):
             yield FilterPanel(id="filter-panel")
 
@@ -39,11 +53,15 @@ class MainScreen(Screen):
                 yield StatsBar(id="stats-bar")
                 yield LogDataTable(id="log-table")
 
-        yield Static("Polling database for updates...", id="status-bar")
+        yield Static("Waiting for traffic...", id="status-bar")
         yield Footer()
 
     def on_mount(self) -> None:
         """Set up polling when screen mounts."""
+        # Initially hide main container, show welcome
+        self.query_one("#main-container").display = False
+        self.query_one("#welcome-banner").display = True
+
         # Poll every 500ms for new log entries
         self.set_interval(0.5, self._poll_logs)
 
@@ -55,6 +73,12 @@ class MainScreen(Screen):
         new_entries = self.log_manager.poll_for_updates()
 
         if new_entries:
+            # Switch from welcome to main view on first data
+            welcome = self.query_one("#welcome-banner")
+            if welcome.display:
+                welcome.display = False
+                self.query_one("#main-container").display = True
+
             table = self.query_one("#log-table", LogDataTable)
             for entry in new_entries:
                 # Check if entry passes filters
@@ -65,9 +89,10 @@ class MainScreen(Screen):
             stats_bar = self.query_one("#stats-bar", StatsBar)
             stats_bar.update_stats(self.log_manager.stats)
 
-            # Update status
+            # Update status with count
             status = self.query_one("#status-bar", Static)
-            status.update(f"Total: {self.log_manager.stats.total} messages")
+            total = self.log_manager.stats.total
+            status.update(f"Capturing... Total: {total} messages")
 
     def _entry_passes_filters(self, entry) -> bool:
         """Check if entry passes current filters."""
