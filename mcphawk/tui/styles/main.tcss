@@ -1,0 +1,103 @@
+/* MCPHawk TUI Styles */
+
+/* Main layout */
+#main-container {
+    height: 1fr;
+}
+
+#filter-panel {
+    width: 25;
+    border-right: solid $primary;
+    padding: 1;
+}
+
+#content-area {
+    width: 1fr;
+}
+
+#stats-bar {
+    height: 1;
+    padding: 0 1;
+    background: $surface;
+    border-bottom: solid $primary-darken-2;
+}
+
+#log-table {
+    height: 1fr;
+}
+
+#status-bar {
+    height: 1;
+    padding: 0 1;
+    background: $surface;
+    border-top: solid $primary-darken-2;
+}
+
+/* Filter panel */
+.filter-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.filter-label {
+    margin-top: 1;
+    color: $text-muted;
+}
+
+#filter-panel Select {
+    width: 100%;
+    margin-bottom: 1;
+}
+
+#filter-panel Input {
+    width: 100%;
+}
+
+/* Log table row styles */
+DataTable > .datatable--cursor {
+    background: $primary;
+}
+
+.request {
+    color: $primary-lighten-2;
+}
+
+.response {
+    color: $success;
+}
+
+.notification {
+    color: $warning;
+}
+
+.error {
+    color: $error;
+}
+
+/* Message detail modal */
+#detail-container {
+    width: 80%;
+    height: 80%;
+    background: $surface;
+    border: thick $primary;
+    padding: 1 2;
+}
+
+#detail-header {
+    height: auto;
+    margin-bottom: 1;
+    padding: 1;
+    background: $surface-darken-1;
+}
+
+#message-view {
+    height: 1fr;
+    overflow-y: auto;
+    border: solid $primary-darken-2;
+    padding: 1;
+}
+
+#close-button {
+    margin-top: 1;
+    width: 100%;
+}

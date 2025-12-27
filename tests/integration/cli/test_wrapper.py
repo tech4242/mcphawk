@@ -155,10 +155,9 @@ class TestMCPWrapper:
         wrapper._try_parse_json('{"not": "jsonrpc"}', "client->server")
         wrapper._log_jsonrpc_message.assert_not_called()
 
-    @patch('mcphawk.wrapper.broadcast_new_log')
     @patch('mcphawk.wrapper.log_message')
-    def test_log_jsonrpc_message_with_broadcast(self, mock_log_message, mock_broadcast):
-        """Test logging with broadcasting."""
+    def test_log_jsonrpc_message(self, mock_log_message):
+        """Test logging JSON-RPC messages."""
         wrapper = MCPWrapper(["test"])
         wrapper.proc = MagicMock()
         wrapper.proc.pid = 12345
@@ -166,9 +165,8 @@ class TestMCPWrapper:
         msg = {"jsonrpc": "2.0", "method": "test", "id": 1}
         wrapper._log_jsonrpc_message(msg, "client->server")
 
-        # Check both logging and broadcasting were called
+        # Check logging was called
         mock_log_message.assert_called_once()
-        # Broadcast might fail if no event loop, that's ok
 
     def test_metadata_includes_command(self):
         """Test that metadata includes the wrapped command."""

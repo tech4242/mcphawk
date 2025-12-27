@@ -104,9 +104,9 @@ class TestAutoDetect:
         mcphawk.sniffer._auto_detect_mode = False
 
     @patch('mcphawk.sniffer.log_message')
-    @patch('mcphawk.sniffer._broadcast_in_any_loop')
+
     @patch('mcphawk.sniffer.logger')
-    def test_auto_detect_prints_port_info(self, mock_logger, mock_broadcast, mock_log):
+    def test_auto_detect_prints_port_info(self, mock_logger, mock_log):
         """Test that auto-detect mode prints port information when MCP traffic is found."""
         import mcphawk.sniffer
         mcphawk.sniffer._auto_detect_mode = True
@@ -133,9 +133,9 @@ class TestAutoDetect:
         assert "test" in logged_entry["message"]
 
     @patch('mcphawk.sniffer.log_message')
-    @patch('mcphawk.sniffer._broadcast_in_any_loop')
+
     @patch('mcphawk.sniffer.logger')
-    def test_non_auto_detect_no_port_print(self, mock_logger, mock_broadcast, mock_log):
+    def test_non_auto_detect_no_port_print(self, mock_logger, mock_log):
         """Test that port info is not printed when not in auto-detect mode."""
         import mcphawk.sniffer
         mcphawk.sniffer._auto_detect_mode = False
@@ -178,8 +178,8 @@ class TestHTTPParsing:
         pass
 
     @patch('mcphawk.sniffer.log_message')
-    @patch('mcphawk.sniffer._broadcast_in_any_loop')
-    def test_http_post_request_parsing(self, mock_broadcast, mock_log):
+
+    def test_http_post_request_parsing(self, mock_log):
         """Test parsing of HTTP POST request with JSON-RPC body."""
         http_request = (
             b'POST /mcp HTTP/1.1\r\n'
@@ -209,8 +209,8 @@ class TestHTTPParsing:
         assert logged_entry["dst_port"] == 8765
 
     @patch('mcphawk.sniffer.log_message')
-    @patch('mcphawk.sniffer._broadcast_in_any_loop')
-    def test_http_response_parsing(self, mock_broadcast, mock_log):
+
+    def test_http_response_parsing(self, mock_log):
         """Test parsing of HTTP response with JSON-RPC body."""
         http_response = (
             b'HTTP/1.1 200 OK\r\n'
@@ -239,8 +239,8 @@ class TestHTTPParsing:
         assert logged_entry["dst_port"] == 54321
 
     @patch('mcphawk.sniffer.log_message')
-    @patch('mcphawk.sniffer._broadcast_in_any_loop')
-    def test_http_without_jsonrpc_ignored(self, mock_broadcast, mock_log):
+
+    def test_http_without_jsonrpc_ignored(self, mock_log):
         """Test that HTTP requests without JSON-RPC content are ignored."""
         http_request = (
             b'POST /api/test HTTP/1.1\r\n'
@@ -265,8 +265,8 @@ class TestHTTPParsing:
 
 
     @patch('mcphawk.sniffer.log_message')
-    @patch('mcphawk.sniffer._broadcast_in_any_loop')
-    def test_mcphawk_mcp_traffic_server_info(self, mock_broadcast, mock_log):
+
+    def test_mcphawk_mcp_traffic_server_info(self, mock_log):
         """Test that MCPHawk's own MCP traffic uses server info tracking."""
         # Simulate an initialize response with serverInfo
         http_response = (
@@ -305,8 +305,8 @@ class TestHTTPParsing:
         # State isolation is maintained through other global variables
 
     @patch('mcphawk.sniffer.log_message')
-    @patch('mcphawk.sniffer._broadcast_in_any_loop')
-    def test_http_sse_response_parsing(self, mock_broadcast, mock_log):
+
+    def test_http_sse_response_parsing(self, mock_log):
         """Test parsing of Server-Sent Events (SSE) responses with JSON-RPC."""
         import json
 

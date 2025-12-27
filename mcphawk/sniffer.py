@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import platform
@@ -12,7 +11,6 @@ from scapy.all import IP, TCP, IPv6, Raw, conf, sniff  # noqa: E402
 
 from mcphawk.logger import log_message  # noqa: E402
 from mcphawk.tcp_reassembly import TCPStreamReassembler  # noqa: E402
-from mcphawk.web.broadcaster import broadcast_new_log  # noqa: E402
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -24,21 +22,6 @@ _server_registry = {}  # {connection_id: server_info}
 def _get_connection_id(src_ip: str, src_port: int, dst_ip: str, dst_port: int) -> str:
     """Generate unique connection identifier for HTTP connections."""
     return f"{src_ip}:{src_port}->{dst_ip}:{dst_port}"
-
-
-async def _safe_broadcast(log_entry: dict) -> None:
-    try:
-        await broadcast_new_log(log_entry)
-    except Exception as e:
-        logger.debug(f"Broadcast failed: {e}")
-
-
-def _broadcast_in_any_loop(log_entry: dict) -> None:
-    try:
-        loop = asyncio.get_running_loop()
-        _ = loop.create_task(_safe_broadcast(log_entry))  # noqa: RUF006
-    except RuntimeError:
-        asyncio.run(_safe_broadcast(log_entry))
 
 
 # Global variable to track auto-detect mode
@@ -140,11 +123,6 @@ def packet_callback(pkt):
                 entry["metadata"] = json.dumps(metadata)
 
             log_message(entry)
-
-            # Convert timestamp to ISO only for WebSocket broadcast
-            broadcast_entry = dict(entry)
-            broadcast_entry["timestamp"] = ts.isoformat()
-            _broadcast_in_any_loop(broadcast_entry)
 
             # In auto-detect mode, log when we find MCP traffic
             if _auto_detect_mode:
@@ -290,11 +268,6 @@ def packet_callback(pkt):
                     entry["metadata"] = json.dumps(metadata)
 
                 log_message(entry)
-
-                # Convert timestamp to ISO only for WebSocket broadcast
-                broadcast_entry = dict(entry)
-                broadcast_entry["timestamp"] = ts.isoformat()
-                _broadcast_in_any_loop(broadcast_entry)
         except Exception as e:
             logger.debug(f"JSON decode failed: {e}")
 

@@ -1,7 +1,5 @@
 """MCP server wrapper for transparent stdio monitoring."""
 
-import asyncio
-import contextlib
 import json
 import logging
 import os
@@ -19,7 +17,6 @@ from mcphawk.stdio_server_detector_fallback import (
     detect_server_from_command,
     merge_server_info,
 )
-from mcphawk.web.broadcaster import broadcast_new_log
 
 logger = logging.getLogger(__name__)
 
@@ -269,19 +266,6 @@ class MCPWrapper:
 
             # Log to database
             log_message(entry)
-
-            # Broadcast to web UI
-            broadcast_entry = dict(entry)
-            broadcast_entry["timestamp"] = ts.isoformat()
-
-            # Try to broadcast
-            try:
-                loop = asyncio.get_running_loop()
-                _ = loop.create_task(broadcast_new_log(broadcast_entry))  # noqa: RUF006
-            except RuntimeError:
-                # No event loop in this thread, try to create one
-                with contextlib.suppress(Exception):
-                    asyncio.run(broadcast_new_log(broadcast_entry))
 
             # Log info
             method = message.get("method", "response")
