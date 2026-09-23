@@ -79,15 +79,11 @@ jobs:
       run: |
         twine check dist/*
     
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      run: |
-        twine upload dist/*
+    - name: Publish to PyPI (Trusted Publishing, no token)
+      uses: pypa/gh-action-pypi-publish@release/v1
     
     - name: Upload release assets
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           dist/*.whl
