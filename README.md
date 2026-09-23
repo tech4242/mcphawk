@@ -96,7 +96,7 @@ Click any call for its details: the tool result rendered the way the model recei
 link you can share. **Replay** sends the same request again, optionally with edited
 arguments, and records the replay next to the original so you can compare.
 
-<img src="docs/images/inspector.jpg" alt="The call inspector: a tool result with the Replay editor open" width="520">
+<img src="docs/images/inspector.jpg" alt="The call inspector: a tool result with the Replay editor open" width="100%">
 
 ### Find out what your servers cost in context
 
