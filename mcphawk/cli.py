@@ -74,10 +74,28 @@ def up(
     no_mcp: bool = typer.Option(False, "--no-mcp", help="Do not serve the MCPHawk MCP endpoint."),
     no_mask: bool = typer.Option(False, "--no-mask", help="Store secrets unmasked."),
     open_browser: bool = typer.Option(False, "--open", help="Open the UI in a browser."),
+    otlp: bool = typer.Option(False, "--otlp",
+                              help="Stream traces, metrics and logs via OTLP (OTEL_* env vars)."),
+    otlp_payloads: bool = typer.Option(False, "--otlp-payloads",
+                                       help="Include (masked) message payloads in OTLP logs."),
     debug: bool = typer.Option(False, "--debug", help="Verbose logging."),
 ) -> None:
     """Start the web UI (plus proxy and MCP endpoint) on one local port."""
-    _serve(port, host, sniff, sniff_filter, no_mcp, no_mask, open_browser, debug)
+    _serve(port, host, sniff, sniff_filter, no_mcp, no_mask, open_browser, debug,
+           otlp or otlp_payloads, otlp_payloads)
+
+
+def _otlp_endpoint() -> str:
+    return os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318 (default)")
+
+
+def _require_otel() -> None:
+    from mcphawk import otel
+
+    if not otel.available():
+        typer.echo("OpenTelemetry support is not installed: pip install 'mcphawk[otel]'",
+                   err=True)
+        raise typer.Exit(2)
 
 
 @app.command(hidden=True)
@@ -89,7 +107,8 @@ def web(port: int = typer.Option(DEFAULT_PORT, "--web-port", "--port")) -> None:
 
 def _serve(port: int = DEFAULT_PORT, host: str = "127.0.0.1", sniff: list[int] | None = None,
            sniff_filter: str | None = None, no_mcp: bool = False, no_mask: bool = False,
-           open_browser: bool = False, debug: bool = False) -> None:
+           open_browser: bool = False, debug: bool = False, otlp: bool = False,
+           otlp_payloads: bool = False) -> None:
     import uvicorn
 
     from mcphawk.web.app import create_app
@@ -107,10 +126,20 @@ def _serve(port: int = DEFAULT_PORT, host: str = "127.0.0.1", sniff: list[int] |
     proxies = installer.load_registry()
     if proxies:
         typer.echo(f"  proxying  {', '.join(sorted(proxies))}")
+    typer.echo(f"  metrics   {url}/metrics")
+    telemetry = None
+    if otlp:
+        _require_otel()
+        from mcphawk.otel.exporter import TelemetryExporter
+        from mcphawk.query import Query
+
+        telemetry = TelemetryExporter.from_env(Query(), include_payloads=otlp_payloads)
+        typer.echo(f"  OTLP      {_otlp_endpoint()}"
+                   + ("  (with payloads)" if otlp_payloads else ""))
     if open_browser:  # pragma: no cover
         threading.Timer(1.0, webbrowser.open, (url,)).start()
-    uvicorn.run(create_app(with_mcp=not no_mcp, mask=not no_mask), host=host, port=port,
-                log_level="debug" if debug else "warning")
+    uvicorn.run(create_app(with_mcp=not no_mcp, mask=not no_mask, telemetry=telemetry),
+                host=host, port=port, log_level="debug" if debug else "warning")
 
 
 @app.command(context_settings={"allow_extra_args": True, "allow_interspersed_args": False,
@@ -312,6 +341,32 @@ def sniff(
         raise typer.Exit(1) from None
     except KeyboardInterrupt:  # pragma: no cover
         pass
+
+
+@app.command()
+def export(
+    otlp: bool = typer.Option(False, "--otlp", help="Send via OTLP (OTEL_* env vars)."),
+    run: str = typer.Option(None, "--run", help="Only this agent run (key from the UI)."),
+    session: str = typer.Option(None, "--session", help="Only this session."),
+    payloads: bool = typer.Option(False, "--payloads", help="Include masked payloads in logs."),
+) -> None:
+    """Send captured traffic (traces and logs) to an OpenTelemetry backend."""
+    if not otlp:
+        typer.echo("choose a format: --otlp", err=True)
+        raise typer.Exit(2)
+    _require_otel()
+    from mcphawk.otel.exporter import TelemetryExporter
+    from mcphawk.query import Query
+
+    q = Query()
+    telemetry = TelemetryExporter.from_env(q, include_payloads=payloads)
+    try:
+        sent = telemetry.export_history(run_key=run, session_id=session)
+    finally:
+        telemetry.shutdown()
+        q.close()
+    typer.echo(f"sent {sent['spans']} spans, {sent['logs']} log records and "
+               f"{sent['runs']} run traces to {_otlp_endpoint()}")
 
 
 @app.command()

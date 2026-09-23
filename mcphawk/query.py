@@ -184,6 +184,7 @@ class Query:
         session_ids: list[str] | None = None,
         since: float | None = None,
         until: float | None = None,
+        ended_since: float | None = None,
         status: str | None = None,
         method: str | None = None,
         target: str | None = None,
@@ -205,6 +206,9 @@ class Query:
         if until is not None:
             where.append("e.started_at <= ?")
             params.append(until)
+        if ended_since is not None:
+            where.append("e.ended_at >= ?")
+            params.append(ended_since)
         if method:
             where.append("e.method = ?")
             params.append(method)
@@ -297,6 +301,7 @@ class Query:
         after_id: int = 0,
         limit: int = 500,
         include_hidden: bool = False,
+        with_body: bool = False,
     ) -> list[dict[str, Any]]:
         where, params = ["m.id > ?"], [after_id]
         if session_id:
@@ -308,11 +313,39 @@ class Query:
             f"""SELECT m.id, m.session_id, m.exchange_id, m.ts, m.direction, m.kind,
                     m.method, m.rpc_id, m.size, m.tokens, m.note,
                     COALESCE(s.name, s.server_name, s.target) AS server
+                    {", m.body" if with_body else ""}
                 FROM messages m JOIN sessions s ON s.id = m.session_id
                 WHERE {" AND ".join(where)} ORDER BY m.id LIMIT ?""",
             [*params, limit],
         )
+        if with_body:
+            for row in rows:
+                row["body"] = _loads(row["body"])
         return rows
+
+    def messages_between(self, session_ids: list[str], since: float,
+                         until: float) -> list[dict[str, Any]]:
+        """Messages (with bodies) of some sessions within a time window."""
+        if not session_ids:
+            return []
+        rows = self._all(
+            f"""SELECT * FROM messages
+                WHERE session_id IN ({",".join("?" * len(session_ids))})
+                  AND ts >= ? AND ts <= ? ORDER BY id""",
+            [*session_ids, since, until])
+        for row in rows:
+            row["body"] = _loads(row["body"])
+            row["headers"] = _loads(row["headers"])
+        return rows
+
+    def finished_calls(self) -> list[dict[str, Any]]:
+        """Minimal rows of every answered call, for metric aggregation."""
+        return self._all(
+            """SELECT e.method, e.target, e.status, e.error_code, e.duration_ms,
+                    e.response_tokens, s.name, s.server_name, s.target AS session_target,
+                    s.client_key, s.client_app, s.client_name, s.protocol_version
+                FROM exchanges e JOIN sessions s ON s.id = e.session_id
+                WHERE e.ended_at IS NOT NULL AND s.hidden = 0""")
 
     def latest_message_id(self) -> int:
         row = self._one("SELECT COALESCE(MAX(id), 0) AS id FROM messages")

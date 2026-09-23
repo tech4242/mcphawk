@@ -29,6 +29,8 @@ capture/  -> store/recorder.py -> SQLite -> query.py + analysis/ -> web/app.py, 
 - `runs.py`: agent runs, computed at read time (client group, split at 5 min idle gaps).
   `sessions.client_key` stores only which client process a session belongs to
 - `install/`: client config locations and install/uninstall
+- `otel/`: OpenTelemetry export (`semconv.py` maps to the MCP semantic conventions,
+  `exporter.py` streams OTLP from `mcphawk up`, `prometheus.py` serves `/metrics`)
 - `frontend/`: Vue 3 app, built into `mcphawk/web/static` (committed)
 
 ## Commands
@@ -63,3 +65,7 @@ make demo           # demo traffic from three SDK servers
   default: their tokens are bound to the server URL.
 - Claude Code retitles its process with its version number; `capture/process.py` falls back
   to `argv[0]` for client names.
+- OpenTelemetry is an optional extra: only `otel/exporter.py` may import the SDK, and only
+  after `mcphawk.otel.available()`; `semconv.py` and `prometheus.py` must work without it.
+  Use the convention names verbatim; anything of ours goes under `mcphawk.*`, and
+  `examples/grafana/mcphawk-dashboard.json` is checked against `/metrics` by a test.

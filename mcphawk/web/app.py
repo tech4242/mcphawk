@@ -17,7 +17,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi import Query as Param
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.routing import Route
 
@@ -26,6 +26,7 @@ from mcphawk import runs as agent_runs
 from mcphawk.analysis import cost, drift, lint, problems
 from mcphawk.capture.http_proxy import Proxy
 from mcphawk.install import installer
+from mcphawk.otel import prometheus
 from mcphawk.query import Query
 from mcphawk.replay import ReplayError, replay
 from mcphawk.store import Recorder
@@ -51,7 +52,9 @@ def create_app(
     with_mcp: bool = True,
     static_dir: Path | None = STATIC_DIR,
     mask: bool = True,
+    telemetry: Any = None,
 ) -> FastAPI:
+    """``telemetry`` is an optional ``mcphawk.otel.exporter.TelemetryExporter``."""
     q = Query(db)
     recorder = Recorder(db, mask=mask)
     proxy = Proxy(upstreams or installer.load_registry, recorder)
@@ -66,10 +69,27 @@ def create_app(
         async with contextlib.AsyncExitStack() as stack:
             if mcp_http is not None:
                 await stack.enter_async_context(mcp_http.router.lifespan_context(mcp_http))
+            exporting = asyncio.create_task(_export_loop()) if telemetry else None
             yield
+            if exporting:
+                exporting.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await exporting
+                await asyncio.to_thread(telemetry.poll)
+                await asyncio.to_thread(telemetry.shutdown)
             await proxy.aclose()
             q.close()
             recorder.close()
+
+    async def _export_loop() -> None:
+        from mcphawk.otel.exporter import POLL_S
+
+        while True:
+            try:
+                await asyncio.to_thread(telemetry.poll)
+            except Exception:  # keep exporting even if one batch fails
+                logger.exception("OpenTelemetry export failed")
+            await asyncio.sleep(POLL_S)
 
     app = FastAPI(title="MCPHawk", lifespan=lifespan, docs_url="/api/docs",
                   openapi_url="/api/openapi.json")
@@ -97,6 +117,11 @@ def create_app(
         return value
 
     # -- read API ---------------------------------------------------------
+
+    @app.get("/metrics", include_in_schema=False)
+    def metrics() -> PlainTextResponse:
+        """Prometheus scrape endpoint (same names as the OTLP metrics)."""
+        return PlainTextResponse(prometheus.render(q), media_type=prometheus.CONTENT_TYPE)
 
     @app.get("/api/stats")
     def stats() -> dict[str, Any]:

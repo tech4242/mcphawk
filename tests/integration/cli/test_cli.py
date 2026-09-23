@@ -165,3 +165,58 @@ def test_web_alias_still_starts_the_ui(monkeypatch):
     assert result.exit_code == 0
     assert calls[0]["port"] == 9100
     assert "now `mcphawk up`" in result.output
+
+
+def test_up_with_otlp(monkeypatch):
+    calls = []
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: calls.append(app))
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:1")
+    result = runner.invoke(cli.app, ["up", "--otlp-payloads"])
+    assert result.exit_code == 0, result.output
+    assert "OTLP      http://127.0.0.1:1  (with payloads)" in result.output
+    assert "/metrics" in result.output
+
+
+def test_otlp_requires_the_extra(monkeypatch):
+    monkeypatch.setattr("mcphawk.otel.available", lambda: False)
+    result = runner.invoke(cli.app, ["up", "--otlp"])
+    assert result.exit_code == 2
+    assert "pip install 'mcphawk[otel]'" in result.output
+    assert runner.invoke(cli.app, ["export", "--otlp"]).exit_code == 2
+
+
+def test_export_command(monkeypatch, recorder):
+    legacy_session(recorder, client_key="pid:1")
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    sent = {}
+
+    def fake_export(self, run_key=None, session_id=None):
+        sent.update(run=run_key, session=session_id)
+        return {"spans": 5, "logs": 11, "runs": 1}
+
+    from mcphawk.otel.exporter import TelemetryExporter
+
+    monkeypatch.setattr(TelemetryExporter, "export_history", fake_export)
+    result = runner.invoke(cli.app, ["export", "--otlp", "--run", "pid:1@1"])
+    assert result.exit_code == 0, result.output
+    assert "sent 5 spans, 11 log records and 1 run traces to http://localhost:4318" in (
+        result.output)
+    assert sent == {"run": "pid:1@1", "session": None}
+    assert runner.invoke(cli.app, ["export"]).exit_code == 2
+
+
+def test_otel_available_detects_missing_packages(monkeypatch):
+    import builtins
+
+    from mcphawk import otel
+
+    real_import = builtins.__import__
+
+    def no_sdk(name, *args, **kwargs):
+        if name.startswith("opentelemetry.sdk"):
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+
+    assert otel.available()
+    monkeypatch.setattr(builtins, "__import__", no_sdk)
+    assert not otel.available()

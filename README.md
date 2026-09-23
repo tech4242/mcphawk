@@ -121,6 +121,37 @@ hints, missing `Mcp-Method` headers, stray output on stdout, deprecated features
 **Compare** puts two sessions of a server side by side: tools added, removed or changed
 (with the change in tokens per turn) and how each call's count, errors and latency moved.
 
+### Send it to Grafana, Datadog or any OpenTelemetry backend
+
+MCPHawk streams what it records as OpenTelemetry **metrics, logs and traces** over OTLP,
+using the [OpenTelemetry conventions for MCP](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/mcp.md),
+so MCP traffic shows up next to everything else you monitor. It works for every server
+MCPHawk records, including ones that have no instrumentation of their own.
+
+Try it locally with Grafana's all-in-one OpenTelemetry image:
+
+```bash
+docker run -p 3000:3000 -p 4318:4318 grafana/otel-lgtm
+pip install 'mcphawk[otel]'
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 mcphawk up --otlp
+```
+
+Then import [`examples/grafana/mcphawk-dashboard.json`](examples/grafana/mcphawk-dashboard.json)
+in Grafana (http://localhost:3000): requests, failures, error rate, p95 latency per tool,
+the failing tools, and what each server's tool definitions cost per turn.
+
+| Signal | What is sent |
+|---|---|
+| Metrics | `mcp.client.operation.duration` (request count, failures by `error.type`, latency), `mcphawk.tool.result.tokens`, `mcphawk.tool.definition.tokens` |
+| Logs | One record per MCP message: method, direction, tool, ids, errors. Payloads only with `--otlp-payloads` (masked, capped) |
+| Traces | One span per call. It joins the agent's own trace when the client sends a `traceparent`; otherwise each agent run is one trace. Every span links back into the MCPHawk UI |
+
+Configuration uses the standard OpenTelemetry variables (`OTEL_EXPORTER_OTLP_ENDPOINT`,
+`OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME`, ...), so any OTLP backend works, for
+example the Datadog Agent's OTLP receiver. Already run Prometheus? `mcphawk up` also
+serves the same metrics at `http://127.0.0.1:8484/metrics` for scraping, and the dashboard
+works with either. To send past traffic, run `mcphawk export --otlp --run <run key>`.
+
 ### Let your agent debug with you
 
 MCPHawk is an MCP server too. Your agent can list runs, read a failing call, check context
@@ -185,7 +216,8 @@ Every result links into the web UI. Replay is deliberately not exposed to agents
 | Spec lint per protocol version | ✅ | ✅ | ❌ | ❌ |
 | MCP server so agents can query traffic | ✅ | ❌ | ❌ | ❌ |
 | Replay | ✅ | ✅ | ✅ | ✅ playground |
-| OTLP / HAR export, CI mode | ❌ not yet | ✅ | ❌ | partial |
+| OpenTelemetry (OTLP) export | ✅ | ✅ | ❌ | ❌ |
+| HAR export, CI mode | ❌ not yet | ✅ | ❌ | partial |
 
 Use the Inspector to poke at a server interactively; use MCPHawk to see what really happens
 when your agent uses it.
@@ -193,7 +225,8 @@ when your agent uses it.
 ## CLI
 
 ```
-mcphawk up          Web UI, API, proxy and /mcp on one port (default command)
+mcphawk up          Web UI, API, proxy, /mcp and /metrics on one port (default command)
+                      --otlp streams metrics, logs and traces to OTEL_EXPORTER_OTLP_ENDPOINT
 mcphawk install     Route client configs through MCPHawk   (--include-http, --dry-run, --client)
 mcphawk uninstall   Restore the original configs
 mcphawk status      Where data lives, what was captured, which servers are routed
@@ -201,6 +234,7 @@ mcphawk wrap        Record one stdio server:  mcphawk wrap --name fs -- npx -y @
 mcphawk proxy       Record one HTTP server:   mcphawk proxy --target https://example.com/mcp
 mcphawk mcp         MCPHawk's own MCP server (stdio or --transport http)
 mcphawk sniff       Passive capture (needs sudo)
+mcphawk export      Send captured traffic to an OpenTelemetry backend (--otlp)
 mcphawk clear       Delete captured traffic
 ```
 
