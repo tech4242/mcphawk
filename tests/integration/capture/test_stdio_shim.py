@@ -219,7 +219,7 @@ def test_recording_failure_never_breaks_the_server(db, monkeypatch):
             raise RuntimeError("no such column: client_key")
 
     request = lines({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {}})
-    shim, code, out, err = run_shim(Broken(), request)
+    _shim, code, out, err = run_shim(Broken(), request)
     assert code == 0
     assert b'"id": 1' in out  # the server still answered
     assert b"not recording this server (no such column: client_key)" in err

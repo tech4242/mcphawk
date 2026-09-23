@@ -162,7 +162,7 @@ def test_export_history_selects_and_skips_pending(recorder, query, telemetry):
     assert sent == {"spans": 5, "logs": 11, "runs": 1}
     assert telemetry.metric_points(semconv.OPERATION_DURATION) == []  # history: no metrics
 
-    older, newer = sorted(runs.list_runs(query), key=lambda r: r["started_at"])
+    _older, newer = sorted(runs.list_runs(query), key=lambda r: r["started_at"])
     telemetry.spans.clear()
     sent = telemetry.exporter.export_history(run_key=newer["run_key"])
     assert sent["spans"] == 5  # includes the call that was never answered

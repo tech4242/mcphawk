@@ -70,7 +70,7 @@ async def test_get_exchange_with_chain_and_truncation(hawk, query):
 
 
 async def test_find_problems_and_cost(hawk):
-    server, ids = hawk
+    server, _ids = hawk
     async with Client(server) as client:
         report = json.loads(text(await client.call_tool("find_problems", {})))
         assert report["summary"]["error"] >= 2

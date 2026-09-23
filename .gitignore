@@ -214,3 +214,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Leftover from the removed 0.x terminal UI (kept locally, not part of the package)
+mcphawk/tui/
