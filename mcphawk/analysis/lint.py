@@ -5,6 +5,7 @@ not faulted for lacking ``resultType``, but a 2026-07-28 one is.
 """
 
 from collections import OrderedDict
+from itertools import pairwise
 from typing import Any
 
 from mcphawk.protocol import jsonrpc
@@ -164,7 +165,7 @@ def _lint_modern_result(findings: _Findings, message, body, request_method) -> N
 
 
 def _lint_tool_order(findings: _Findings, orders: list[list[str]]) -> None:
-    for previous, current in zip(orders, orders[1:]):
+    for previous, current in pairwise(orders):
         if set(previous) == set(current) and previous != current:
             findings.add("nondeterministic-tools",
                          "Same tools returned in a different order (hurts caching)")

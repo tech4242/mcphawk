@@ -1,83 +1,82 @@
-.PHONY: install install-frontend build build-frontend dev dev-backend dev-frontend test test-unit test-integration test-db test-network test-cli test-web test-mcp test-watch coverage coverage-report lint format format-unsafe clean
+.PHONY: install install-backend install-frontend build build-frontend dev dev-backend dev-frontend demo test test-unit test-integration test-db test-capture test-network test-install test-cli test-web test-mcp test-e2e coverage lint format clean
 
-# Install all dependencies
+# Setup
 install: install-backend install-frontend
 
 install-backend:
-	pip3 install -e .
 	pip install -r requirements-dev.txt
+	pip install -e .
 
 install-frontend:
 	cd frontend && npm install
 
-# Build for production
+# Build (the built UI is committed to mcphawk/web/static)
 build: build-frontend
+	python -m build
 
 build-frontend:
 	cd frontend && npm run build
 
-# Development commands
+# Development: API on 8484, Vite with hot reload on 5173
 dev:
-	@echo "Starting both backend and frontend..."
 	@make -j 2 dev-backend dev-frontend
 
 dev-backend:
-	mcphawk web --port 3000
+	mcphawk up
 
 dev-frontend:
 	cd frontend && npm run dev
 
-# Testing
+# Generate realistic demo traffic into the default database
+demo:
+	python examples/demo/run_demo.py
+
+# Tests
 test:
-	python3 -m pytest -v
+	python -m pytest -v
 
 test-unit:
-	python3 -m pytest tests/unit -v
+	python -m pytest tests/unit -v
 
 test-integration:
-	python3 -m pytest tests/integration -v
+	python -m pytest tests/integration -v
 
 test-db:
-	python3 -m pytest tests/integration/db -v
+	python -m pytest tests/integration/db -v
+
+test-capture:
+	python -m pytest tests/integration/capture -v
 
 test-network:
-	python3 -m pytest tests/integration/network -v
+	python -m pytest tests/integration/network -v
+
+test-install:
+	python -m pytest tests/integration/install -v
 
 test-cli:
-	python3 -m pytest tests/integration/cli -v
+	python -m pytest tests/integration/cli -v
 
 test-web:
-	python3 -m pytest tests/integration/web -v
+	python -m pytest tests/integration/web -v
 
 test-mcp:
-	python3 -m pytest tests/integration/mcp -v
+	python -m pytest tests/integration/mcp -v
 
-test-watch:
-	python3 -m pytest -v --watch
+test-e2e:
+	python -m pytest tests/integration/e2e -v
 
-# Coverage
+# Coverage (fails under 85%, see pyproject.toml)
 coverage:
-	python3 -m pytest -v --cov=mcphawk --cov-report=html --cov-report=term
+	python -m pytest --cov=mcphawk --cov-report=html --cov-report=term --cov-report=xml
 
-coverage-report:
-	python3 -m pytest -v --cov=mcphawk --cov-report=html --cov-report=term --cov-report=xml
-	@echo "Coverage report generated in htmlcov/index.html"
-
-# Linting
+# Code quality
 lint:
 	ruff check .
 
 format:
 	ruff check . --fix
 
-format-unsafe:
-	ruff check . --fix --unsafe-fixes
-
-# Clean
 clean:
-	rm -rf frontend/node_modules
-	rm -rf frontend/dist
-	rm -rf mcphawk/web/static/*
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type d -name .pytest_cache -exec rm -rf {} +
-	find . -type d -name .coverage -exec rm -rf {} +
+	rm -rf frontend/node_modules build dist *.egg-info htmlcov .coverage coverage.xml
+	find . -type d -name __pycache__ -prune -exec rm -rf {} +
+	find . -type d -name .pytest_cache -prune -exec rm -rf {} +

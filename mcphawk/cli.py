@@ -80,6 +80,13 @@ def up(
     _serve(port, host, sniff, sniff_filter, no_mcp, no_mask, open_browser, debug)
 
 
+@app.command(hidden=True)
+def web(port: int = typer.Option(DEFAULT_PORT, "--web-port", "--port")) -> None:
+    """Renamed to `mcphawk up` in 1.0."""
+    typer.echo("`mcphawk web` is now `mcphawk up`; starting it for you.", err=True)
+    _serve(port)
+
+
 def _serve(port: int = DEFAULT_PORT, host: str = "127.0.0.1", sniff: list[int] | None = None,
            sniff_filter: str | None = None, no_mcp: bool = False, no_mask: bool = False,
            open_browser: bool = False, debug: bool = False) -> None:

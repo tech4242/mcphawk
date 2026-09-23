@@ -153,3 +153,12 @@ def test_sniff_filter_builder():
     assert cli._sniff_filter([1], None, False) == "tcp port 1"
     assert cli._sniff_filter(None, None, True) == "tcp"
     assert cli._sniff_filter(None, None, False) is None
+
+
+def test_web_alias_still_starts_the_ui(monkeypatch):
+    calls = []
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: calls.append(kw))
+    result = runner.invoke(cli.app, ["web", "--web-port", "9100"])
+    assert result.exit_code == 0
+    assert calls[0]["port"] == 9100
+    assert "now `mcphawk up`" in result.output
