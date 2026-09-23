@@ -84,11 +84,15 @@ def _is_mcphawk(command: str | None, args: list[str]) -> bool:
 def wrapped_original(server: dict[str, Any]) -> tuple[str, list[str]] | None:
     """The original command of a wrapped stdio server, or None."""
     args = [str(a) for a in server.get("args") or []]
-    if not _is_mcphawk(server.get("command"), args):
+    if not _is_mcphawk(server.get("command"), args) or WRAP_MARKER not in args:
         return None
-    if WRAP_MARKER not in args or "--" not in args:
-        return None
-    rest = args[args.index("--") + 1:]
+    after_wrap = args[args.index(WRAP_MARKER) + 1:]
+    if "--" in after_wrap:
+        rest = after_wrap[after_wrap.index("--") + 1:]
+    else:
+        # v0.x syntax: `mcphawk wrap [--debug] <command...>`
+        rest = [a for i, a in enumerate(after_wrap)
+                if not (a in ("--debug", "-d") and i == 0)]
     return (rest[0], rest[1:]) if rest else None
 
 

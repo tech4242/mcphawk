@@ -154,6 +154,11 @@ def test_wrapped_original_variants():
         "-m", "mcphawk", "wrap", "--"]}) is None
     assert ins.wrapped_original({"command": "mcphawk", "args": ["mcp"]}) is None
     assert ins.wrapped_original({"command": None}) is None
+    legacy = {"command": "/venv/bin/mcphawk", "args": ["wrap", "npx", "-y", "ctx7"]}
+    assert ins.wrapped_original(legacy) == ("npx", ["-y", "ctx7"])
+    debug = {"command": "mcphawk", "args": ["wrap", "--debug", "srv"]}
+    assert ins.wrapped_original(debug) == ("srv", [])
+    assert ins.wrapped_original({"command": "mcphawk", "args": ["wrap"]}) is None
 
 
 def test_mcphawk_command_resolution(monkeypatch, tmp_path):

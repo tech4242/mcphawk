@@ -184,3 +184,30 @@ def test_find_client_skips_launcher_chain(monkeypatch):
         node = node._parent
     monkeypatch.setattr(process.psutil, "Process", lambda pid: deep)
     assert process.find_client(50, max_depth=3).pid == 50
+
+
+def test_find_client_uses_argv0_for_version_titled_processes(monkeypatch):
+    class Proc:
+        pid = 70
+
+        def __init__(self, cmd):
+            self._cmd = cmd
+
+        def name(self):
+            return "2.1.280"
+
+        def cmdline(self):
+            if self._cmd is None:
+                raise process.psutil.AccessDenied()
+            return self._cmd
+
+        def parent(self):  # pragma: no cover - not a launcher, never walked
+            return None
+
+        def create_time(self):
+            return 1.0
+
+    for cmd, expected in ((["/usr/local/bin/claude", "--resume"], "claude"),
+                          (None, "2.1.280"), ([""], "2.1.280")):
+        monkeypatch.setattr(process.psutil, "Process", lambda pid, c=cmd: Proc(c))
+        assert process.find_client(70).name == expected

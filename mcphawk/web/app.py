@@ -231,7 +231,7 @@ def create_app(
 
         @app.get("/{path:path}", include_in_schema=False)
         def spa(path: str) -> FileResponse:
-            if path.startswith(("api/", "p/", "mcp")):
+            if path == "mcp" or path.startswith(("api/", "p/", "mcp/")):
                 raise HTTPException(404)
             candidate = (static_dir / path).resolve()
             if path and candidate.is_file() and static_dir.resolve() in candidate.parents:

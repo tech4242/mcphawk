@@ -1,10 +1,29 @@
 import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
-import './assets/main.css'
+import './style.css'
+import './live.js'
 
-const app = createApp(App)
-const pinia = createPinia()
+import HomeView from './views/HomeView.vue'
+import TrafficView from './views/TrafficView.vue'
+import ExchangeRedirect from './views/ExchangeRedirect.vue'
+import ProblemsView from './views/ProblemsView.vue'
+import CostView from './views/CostView.vue'
+import CompareView from './views/CompareView.vue'
+import SetupView from './views/SetupView.vue'
 
-app.use(pinia)
-app.mount('#app')
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', component: HomeView },
+    { path: '/r/:key', component: TrafficView, props: (r) => ({ runKey: r.params.key }) },
+    { path: '/s/:id', component: TrafficView, props: (r) => ({ sessionId: r.params.id }) },
+    { path: '/x/:id', component: ExchangeRedirect, props: true },
+    { path: '/problems', component: ProblemsView },
+    { path: '/cost', component: CostView },
+    { path: '/compare', component: CompareView },
+    { path: '/setup', component: SetupView },
+  ],
+})
+
+createApp(App).use(router).mount('#app')

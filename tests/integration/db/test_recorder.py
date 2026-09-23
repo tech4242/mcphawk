@@ -155,3 +155,25 @@ def test_recorders_in_parallel_share_the_database(db):
     assert rows(db, "SELECT COUNT(*) AS n FROM sessions")[0]["n"] == 2
     a.close()
     b.close()
+
+
+def test_response_recorded_before_its_request_is_paired(db, recorder):
+    sid = recorder.open_session(capture="wrap", transport="stdio")
+    recorder.record(sid, S2C, frame(id=5, result={"content": []}), ts=10.5)
+    recorder.record(sid, C2S, frame(id=5, method="tools/call", params={"name": "t"}), ts=10.4)
+    exchange = rows(db, "SELECT * FROM exchanges")[0]
+    assert exchange["status"] == "ok"
+    assert exchange["response_msg_id"] == 1
+    assert exchange["duration_ms"] == 100.0
+    notes = rows(db, "SELECT note, exchange_id FROM messages ORDER BY id")
+    assert notes == [{"note": None, "exchange_id": 1}, {"note": None, "exchange_id": 1}]
+
+
+def test_early_responses_are_bounded(db, recorder, monkeypatch):
+    from mcphawk.store import recorder as rec_mod
+
+    monkeypatch.setattr(rec_mod, "MAX_EARLY", 2)
+    sid = recorder.open_session(capture="wrap", transport="stdio")
+    for i in range(4):
+        recorder.record(sid, S2C, frame(id=i, result={}))
+    assert len(recorder._sessions[sid].early) == 2

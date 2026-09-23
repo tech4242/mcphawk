@@ -1,121 +1,52 @@
+<script setup>
+import RunRail from './components/RunRail.vue'
+import { live } from './live.js'
+</script>
+
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-    <!-- Header -->
-    <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 z-10">
-      <div class="px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-          <div class="flex items-center space-x-4">
-            <img src="/mcphawk_logo.png" alt="MCPHawk Logo" class="h-[62px]">
-            <div class="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
-            <button
-              @click="toggleSidebar"
-              class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
-              :title="sidebarOpen ? 'Hide filters' : 'Show filters'"
-            >
-              <ViewColumnsIcon class="h-5 w-5" />
-              <span class="text-sm font-medium hidden sm:inline">
-                {{ sidebarOpen ? 'Hide' : 'Show' }} Filters
-              </span>
-            </button>
-            <ConnectionStatus />
-          </div>
-          <div class="flex items-center space-x-4">
-            <StatsPanel />
-            <ThemeToggle />
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Content Area -->
-    <div class="flex-1 flex overflow-hidden">
-      <!-- Sidebar -->
-      <aside
-        :class="[
-          'w-64 flex-shrink-0 overflow-hidden transition-all duration-300',
-          windowWidth < 1024 
-            ? 'fixed inset-y-0 left-0 z-40' 
-            : 'relative',
-          sidebarOpen 
-            ? 'translate-x-0' 
-            : '-translate-x-full lg:hidden'
-        ]"
-      >
-        <div class="h-full lg:h-full" :class="{'mt-16': true, 'lg:mt-0': true}">
-          <LogFiltersSidebar />
-        </div>
-      </aside>
-
-      <!-- Mobile sidebar backdrop -->
-      <div
-        v-if="sidebarOpen && windowWidth < 1024"
-        @click="sidebarOpen = false"
-        class="fixed inset-0 bg-black/50 z-30 mt-16"
-      ></div>
-
-      <!-- Main Content -->
-      <main class="flex-1 overflow-auto">
-        <div class="px-4 sm:px-6 lg:px-8 py-6">
-          <!-- Search Bar and Actions -->
-          <div class="mb-6">
-            <LogSearchBar />
-          </div>
-
-          <!-- Log Table -->
-          <div class="bg-white dark:bg-gray-800 shadow-xl rounded-xl overflow-hidden">
-            <LogTable />
-          </div>
-        </div>
-      </main>
-    </div>
-
-    <!-- Message Detail Modal -->
-    <MessageDetailModal />
+  <div class="shell">
+    <aside class="rail">
+      <router-link to="/" class="brand" aria-label="MCPHawk home">
+        <img src="/mcphawk_logo.png" alt="MCPHawk" width="923" height="507" />
+        <span class="dot" :class="{ on: live.connected }" role="status"
+              :title="live.connected ? 'Live: new traffic appears automatically' : 'Reconnecting'" />
+      </router-link>
+      <nav class="nav">
+        <router-link to="/problems">Problems</router-link>
+        <router-link to="/cost">Context cost</router-link>
+        <router-link to="/compare">Compare</router-link>
+        <router-link to="/setup">Setup</router-link>
+      </nav>
+      <RunRail />
+    </aside>
+    <main class="main">
+      <router-view :key="$route.path" />
+    </main>
   </div>
 </template>
 
-<script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
-import { useLogStore } from '@/stores/logs'
-import { useWebSocketStore } from '@/stores/websocket'
-import ConnectionStatus from '@/components/common/ConnectionStatus.vue'
-import ThemeToggle from '@/components/common/ThemeToggle.vue'
-import StatsPanel from '@/components/Stats/StatsPanel.vue'
-import LogFiltersSidebar from '@/components/LogTable/LogFiltersSidebar.vue'
-import LogSearchBar from '@/components/LogTable/LogSearchBar.vue'
-import LogTable from '@/components/LogTable/LogTable.vue'
-import MessageDetailModal from '@/components/MessageDetail/MessageDetailModal.vue'
-import { ViewColumnsIcon } from '@heroicons/vue/24/outline'
-
-const logStore = useLogStore()
-const wsStore = useWebSocketStore()
-const sidebarOpen = ref(true) // Default to open on desktop
-const windowWidth = ref(window.innerWidth)
-
-// Handle window resize
-const handleResize = () => {
-  windowWidth.value = window.innerWidth
+<style scoped>
+.shell { display: grid; grid-template-columns: 248px 1fr; height: 100%; }
+.rail {
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0;
+  background: color-mix(in srgb, var(--surface) 55%, var(--dusk));
 }
-
-// Toggle sidebar
-const toggleSidebar = () => {
-  sidebarOpen.value = !sidebarOpen.value
+.brand { position: relative; display: block; padding: 14px 20px 12px; }
+.brand img { display: block; width: 100%; max-width: 190px; height: auto; margin: 0 auto; }
+.dot {
+  position: absolute; top: 12px; right: 12px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--faint);
 }
-
-onMounted(() => {
-  // Load initial logs
-  logStore.fetchLogs()
-  
-  // Connect WebSocket
-  wsStore.connect()
-  
-  // Add resize listener
-  window.addEventListener('resize', handleResize)
-  handleResize() // Initial check
-})
-
-onUnmounted(() => {
-  wsStore.disconnect()
-  window.removeEventListener('resize', handleResize)
-})
-</script>
+.dot.on { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+.nav { display: flex; flex-direction: column; padding: 0 8px 10px; border-bottom: 1px solid var(--line); }
+.nav a { padding: 5px 8px; border-radius: var(--radius); text-decoration: none; color: var(--muted); }
+.nav a:hover { color: var(--text); background: var(--raised); }
+.nav a.router-link-active { color: var(--text); background: var(--raised); }
+.main { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+@media (max-width: 760px) {
+  .shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .rail { max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--line); }
+  .brand img { max-width: 120px; margin: 0; }
+}
+</style>

@@ -32,6 +32,7 @@ STATUS_INPUT_REQUIRED = "input_required"
 STATUS_CANCELLED = "cancelled"
 
 HIDDEN_SERVER_NAMES = frozenset({"mcphawk"})
+MAX_EARLY = 64
 
 
 @dataclass
@@ -39,6 +40,10 @@ class _SessionState:
     pending: dict[tuple[str, str], tuple[int, str, float]] = field(default_factory=dict)
     # requestState token -> exchange that asked for more input
     input_states: dict[str, int] = field(default_factory=dict)
+    # responses that were recorded before their request: the two directions
+    # are captured by different threads, and a fast server can win the race
+    early: dict[tuple[str, str], tuple[int, dict[str, Any], str, float]] = field(
+        default_factory=dict)
     identity: dict[str, Any] = field(default_factory=dict)
 
 
@@ -182,6 +187,16 @@ class Recorder:
                 session_id, state, direction, msg, method, rpc_key, message_id, now)
             self._link(message_id, exchange_id)
             self._absorb_request_identity(session_id, state, msg)
+            initiator = "client" if direction == C2S else "server"
+            early = state.early.pop((initiator, rpc_key), None) if rpc_key else None
+            if early:
+                response_id, response, response_kind, response_ts = early
+                state.pending.pop((initiator, rpc_key), None)
+                self._close_exchange(session_id, state, exchange_id, method, response,
+                                     response_kind, response_id, now, max(now, response_ts))
+                self._link(response_id, exchange_id)
+                self._conn.execute("UPDATE messages SET note = NULL WHERE id = ?",
+                                   (response_id,))
         elif kind in (jsonrpc.RESPONSE, jsonrpc.ERROR):
             initiator = "client" if direction == S2C else "server"
             pending = state.pending.pop((initiator, rpc_key), None) if rpc_key else None
@@ -192,6 +207,10 @@ class Recorder:
                     message_id, started, now)
                 self._link(message_id, exchange_id)
             else:
+                if rpc_key:
+                    state.early[(initiator, rpc_key)] = (message_id, msg, kind, now)
+                    if len(state.early) > MAX_EARLY:
+                        state.early.pop(next(iter(state.early)))
                 self._conn.execute(
                     "UPDATE messages SET note = ? WHERE id = ?",
                     ("no matching request", message_id))
