@@ -127,15 +127,15 @@ def _findings(servers: list[dict[str, Any]], heaviest: list[dict[str, Any]]) -> 
         for definition in big:
             findings.append(
                 f"{server['server']}: tool '{definition['name']}' definition costs "
-                f"≈{definition['total']} tokens every turn")
+                f"≈{definition['total']:,} tokens every turn")
         unused = server["unused_tools"]
         if server["calls"] and unused:
             wasted = sum(d["total"] for d in server["definitions"] if d["name"] in unused)
             findings.append(
                 f"{server['server']}: {len(unused)} of {server['tool_count']} tools were "
-                f"never called here (≈{wasted} tokens/turn)")
+                f"never called here (≈{wasted:,} tokens/turn)")
     findings.extend(
-        f"{h['server']}: a '{h['tool']}' result was ≈{h['tokens']} tokens "
+        f"{h['server']}: a '{h['tool']}' result was ≈{h['tokens']:,} tokens "
         f"(exchange {h['exchange_id']})"
         for h in heaviest if h["tokens"] >= LARGE_RESULT_TOKENS)
     return findings
