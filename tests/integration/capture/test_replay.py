@@ -41,7 +41,7 @@ async def test_replay_stdio_with_edited_params(recorder, query):
     assert result["response"]["result"]["echo"]["arguments"] == {"text": "edited"}
     replayed = query.get_session(result["session_id"])
     assert replayed["capture"] == "replay"
-    assert replayed["run_key"] == f"replay:{original['id']}"
+    assert replayed["client_key"] == f"replay:{original['id']}"
     assert replayed["display_name"] == "echo (replay)"
     assert replayed["ended_at"] is not None
     assert [e["method"] for e in replayed["exchanges"]] == ["initialize", "tools/call"]

@@ -18,7 +18,7 @@ HUNG_AFTER_S = 30.0
 IDLE_AFTER_S = 600.0
 
 _SESSION_COLUMNS = (
-    "id, run_key, name, capture, transport, target, client_app, client_name, "
+    "id, client_key, name, capture, transport, target, client_app, client_name, "
     "client_version, server_name, server_version, protocol_version, era, pid, "
     "client_pid, started_at, last_seen_at, ended_at, hidden"
 )
@@ -101,20 +101,20 @@ class Query:
             exchange["duration_ms"] = round((self._now() - exchange["started_at"]) * 1000, 3)
         return exchange
 
-    # -- sessions & runs --------------------------------------------------
+    # -- sessions ---------------------------------------------------------
 
     def list_sessions(
         self,
         *,
-        run_key: str | None = None,
+        session_ids: list[str] | None = None,
         server: str | None = None,
         limit: int = 100,
         include_hidden: bool = False,
     ) -> list[dict[str, Any]]:
         where, params = ["1=1"], []
-        if run_key:
-            where.append("s.run_key = ?")
-            params.append(run_key)
+        if session_ids is not None:
+            where.append(f"s.id IN ({','.join('?' * len(session_ids)) or 'NULL'})")
+            params += session_ids
         if server:
             where.append("(s.server_name = ? OR s.name = ?)")
             params += [server, server]
@@ -157,80 +157,23 @@ class Query:
         session["invalid_count"] = counts.get("invalid") or 0
         return session
 
-    def list_runs(self, limit: int = 50, include_hidden: bool = False) -> list[dict[str, Any]]:
-        """Group sessions by the client process (or client identity) that drove them."""
-        hidden = "" if include_hidden else "AND s.hidden = 0"
-        runs = self._all(
-            f"""SELECT COALESCE(s.run_key, 'session:' || s.id) AS run_key,
-                    MAX(s.client_app) AS client_app, MAX(s.client_name) AS client_name,
-                    MIN(s.started_at) AS started_at, MAX(s.last_seen_at) AS last_seen_at,
-                    COUNT(DISTINCT s.id) AS session_count,
-                    GROUP_CONCAT(DISTINCT COALESCE(s.name, s.server_name, s.target))
-                        AS servers
-                FROM sessions s WHERE 1=1 {hidden}
-                GROUP BY COALESCE(s.run_key, 'session:' || s.id)
-                ORDER BY last_seen_at DESC LIMIT ?""",
-            (limit,),
-        )
-        for run in runs:
-            run["servers"] = sorted(filter(None, (run["servers"] or "").split(",")))
-            stats = self._one(
-                f"""SELECT COUNT(e.id) AS exchanges,
-                        SUM(CASE WHEN e.status IN ('error', 'tool_error') THEN 1 ELSE 0 END)
-                            AS errors,
-                        COALESCE(SUM(e.request_tokens + e.response_tokens), 0) AS tokens
-                    FROM exchanges e JOIN sessions s ON s.id = e.session_id
-                    WHERE {self._run_clause()} {hidden}""",
-                self._run_params(run["run_key"]),
-            ) or {}
-            run["exchange_count"] = stats.get("exchanges") or 0
-            run["error_count"] = stats.get("errors") or 0
-            run["tokens"] = stats.get("tokens") or 0
-            sessions = self._all(
-                f"SELECT {_SESSION_COLUMNS} FROM sessions s WHERE {self._run_clause()}",
-                self._run_params(run["run_key"]))
-            run["live"] = any(self._is_live(s) for s in sessions)
-        return runs
-
-    @staticmethod
-    def _run_clause() -> str:
-        return "(s.run_key = ? OR (s.run_key IS NULL AND 'session:' || s.id = ?))"
-
-    @staticmethod
-    def _run_params(run_key: str) -> tuple[str, str]:
-        return (run_key, run_key)
-
-    def get_run(self, run_key: str, include_hidden: bool = False) -> dict[str, Any] | None:
-        hidden = "" if include_hidden else "AND s.hidden = 0"
+    def activity(self, include_hidden: bool = False, limit: int = 2000
+                 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Recent sessions and the timing of their exchanges, for grouping runs."""
+        hidden = "" if include_hidden else "WHERE hidden = 0"
         sessions = self._all(
-            f"""SELECT {_SESSION_COLUMNS} FROM sessions s
-                WHERE {self._run_clause()} {hidden} ORDER BY started_at""",
-            self._run_params(run_key),
-        )
-        if not sessions:
-            return None
-        live_by_session = {}
+            f"""SELECT {_SESSION_COLUMNS} FROM sessions {hidden}
+                ORDER BY last_seen_at DESC LIMIT ?""", (limit,))
         for session in sessions:
             self._decorate_session(session)
-            live_by_session[session["id"]] = session["live"]
-        timeline = self._all(
-            f"""SELECT {_EXCHANGE_COLUMNS} FROM exchanges e
-                WHERE e.session_id IN ({",".join("?" * len(sessions))})
-                ORDER BY e.started_at, e.id""",
-            [s["id"] for s in sessions],
-        )
-        for exchange in timeline:
-            self._decorate_exchange(exchange, live_by_session[exchange["session_id"]])
-        return {
-            "run_key": run_key,
-            "client_app": next((s["client_app"] for s in sessions if s["client_app"]), None),
-            "client_name": next((s["client_name"] for s in sessions if s["client_name"]), None),
-            "started_at": sessions[0]["started_at"],
-            "last_seen_at": max(s["last_seen_at"] for s in sessions),
-            "live": any(live_by_session.values()),
-            "sessions": sessions,
-            "timeline": timeline,
-        }
+        ids = [s["id"] for s in sessions]
+        if not ids:
+            return [], []
+        timings = self._all(
+            f"""SELECT session_id, started_at, COALESCE(ended_at, started_at) AS ended_at,
+                    status, request_tokens + response_tokens AS tokens
+                FROM exchanges WHERE session_id IN ({",".join("?" * len(ids))})""", ids)
+        return sessions, timings
 
     # -- exchanges & messages --------------------------------------------
 
@@ -238,6 +181,9 @@ class Query:
         self,
         *,
         session_id: str | None = None,
+        session_ids: list[str] | None = None,
+        since: float | None = None,
+        until: float | None = None,
         status: str | None = None,
         method: str | None = None,
         target: str | None = None,
@@ -250,6 +196,15 @@ class Query:
         if session_id:
             where.append("e.session_id = ?")
             params.append(session_id)
+        if session_ids is not None:
+            where.append(f"e.session_id IN ({','.join('?' * len(session_ids)) or 'NULL'})")
+            params += session_ids
+        if since is not None:
+            where.append("e.started_at >= ?")
+            params.append(since)
+        if until is not None:
+            where.append("e.started_at <= ?")
+            params.append(until)
         if method:
             where.append("e.method = ?")
             params.append(method)
@@ -410,17 +365,3 @@ class Query:
                 "DELETE FROM messages; DELETE FROM exchanges; DELETE FROM sessions;")
             self._conn.commit()
 
-
-def resolve_scope(
-    q: Query,
-    *,
-    session_id: str | None = None,
-    run_key: str | None = None,
-    server: str | None = None,
-    limit: int = 200,
-) -> list[dict[str, Any]]:
-    """Sessions an analysis should look at, newest first."""
-    if session_id:
-        session = q.get_session_header(session_id)
-        return [session] if session else []
-    return q.list_sessions(run_key=run_key, server=server, limit=limit)

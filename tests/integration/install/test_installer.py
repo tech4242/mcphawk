@@ -140,7 +140,9 @@ def test_apply_skips_file_that_became_unparsable(home):
     assert notes == [f"skipped {desktop}: could not parse it"]
 
 
-def test_backup_names_do_not_collide(home):
+def test_backup_names_do_not_collide(home, monkeypatch):
+    monkeypatch.setattr(ins.Path, "home", lambda: home)
+    assert "-home-.claude.json" in ins.backup(home / ".claude.json").name
     path = home / ".cursor" / "mcp.json"
     first, second = ins.backup(path), ins.backup(path)
     assert first != second

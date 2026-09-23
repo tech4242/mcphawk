@@ -12,7 +12,6 @@ to be inferred, and each protocol generation needs a different key:
 
 import threading
 import time
-import uuid
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
@@ -48,11 +47,10 @@ class HttpSessions:
         self._keys: dict[tuple[str, str], str] = {}
         self._last_seen: dict[str, float] = {}
 
-    def _open(self, upstream: str, name: str | None, transport: str,
-              run_key: str | None = None) -> str:
+    def _open(self, upstream: str, name: str | None, transport: str) -> str:
+        # HTTP sessions have no client process; runs group them by client identity
         return self.recorder.open_session(
-            capture=self.capture, transport=transport, name=name, target=upstream,
-            run_key=run_key)
+            capture=self.capture, transport=transport, name=name, target=upstream)
 
     def _touch(self, session_id: str) -> str:
         self._last_seen[session_id] = self._now()
@@ -91,8 +89,7 @@ class HttpSessions:
             current = self._keys.get(key)
             if current and self._now() - self._last_seen.get(current, 0) < IDLE_ROLLOVER_S:
                 return self._touch(current)
-            run_key = f"client:{label}:{uuid.uuid4().hex[:8]}"
-            self._keys[key] = self._open(upstream, name, "streamable_http", run_key)
+            self._keys[key] = self._open(upstream, name, "streamable_http")
             return self._touch(self._keys[key])
 
     def bind_session_header(self, session_id: str, upstream: str, value: str | None) -> None:

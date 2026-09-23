@@ -76,7 +76,7 @@ async def replay(q: Query, recorder: Recorder, exchange_id: int,
     new_session = recorder.open_session(
         capture="replay", transport=session["transport"],
         name=f"{session['display_name']} (replay)", target=session["target"],
-        run_key=f"replay:{exchange_id}")
+        client_key=f"replay:{exchange_id}")
     try:
         response = await asyncio.wait_for(
             runner(session, handshake, request, lambda d, m: recorder.record(

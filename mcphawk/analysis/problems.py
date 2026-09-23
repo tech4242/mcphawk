@@ -5,7 +5,8 @@ import json
 from typing import Any
 
 from mcphawk.analysis import lint as lint_mod
-from mcphawk.query import Query, resolve_scope
+from mcphawk.query import Query
+from mcphawk.runs import resolve_scope
 
 SLOW_MS = 10_000
 LOOP_REPEATS = 3
@@ -80,12 +81,14 @@ def find_problems(
     min_severity: str = lint_mod.WARNING,
     limit: int = 100,
 ) -> dict[str, Any]:
-    sessions = resolve_scope(q, session_id=session_id, run_key=run_key, server=server)
+    scope = resolve_scope(q, session_id=session_id, run_key=run_key, server=server)
+    sessions = scope.sessions
     names = {s["id"]: s["display_name"] for s in sessions}
     threshold = lint_mod.SEVERITY_ORDER[min_severity]
     problems: list[dict[str, Any]] = []
     for session in sessions:
-        exchanges = q.exchanges(session_id=session["id"], live=session["live"])
+        exchanges = q.exchanges(session_id=session["id"], live=session["live"],
+                                since=scope.since, until=scope.until)
         for exchange in exchanges:
             problem = _exchange_problem(exchange, session["display_name"])
             if problem:

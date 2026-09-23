@@ -3,7 +3,7 @@ import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api.js'
 import { live } from '../live.js'
-import { call, serverColor, STATUS_LABELS, when } from '../format.js'
+import { call, serverColor, STATUS_LABELS, timeRange, when } from '../format.js'
 import Waterfall from '../components/Waterfall.vue'
 import ExchangeDetail from '../components/ExchangeDetail.vue'
 import ProblemList from '../components/ProblemList.vue'
@@ -30,9 +30,8 @@ async function load() {
     } else {
       const session = await api.session(props.sessionId)
       data.value = {
-        run_key: session.run_key, live: session.live, client_app: session.client_app,
-        client_name: session.client_name, started_at: session.started_at,
-        sessions: [session], timeline: session.exchanges,
+        live: session.live, started_at: session.started_at,
+        last_seen_at: session.last_seen_at, sessions: [session], timeline: session.exchanges,
       }
     }
     error.value = null
@@ -102,8 +101,7 @@ const statusCounts = computed(() => {
 const title = computed(() => {
   if (!data.value) return ''
   if (props.sessionId) return data.value.sessions[0].display_name
-  if (props.runKey?.startsWith('replay:')) return 'Replay'
-  return data.value.client_app || data.value.client_name || 'Run'
+  return data.value.client
 })
 
 const scope = computed(() => (props.sessionId
@@ -129,7 +127,8 @@ function setTab(name) {
       <div class="title-row">
         <h1>{{ title }}</h1>
         <span v-if="data.live" class="live">live</span>
-        <span class="faint">started {{ when(data.started_at) }}</span>
+        <span v-if="sessionId" class="faint">session started {{ when(data.started_at) }}</span>
+        <span v-else class="faint">{{ timeRange(data.started_at, data.last_seen_at) }}</span>
       </div>
       <div class="servers">
         <router-link v-for="server in servers" :key="server.name" :to="`/s/${server.latest.id}`"

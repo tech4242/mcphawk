@@ -40,3 +40,15 @@ const SERVER_HUES = ['#7aa2f7', '#e0af68', '#9ece6a', '#bb9af7', '#7dcfff', '#ff
 export function serverColor(index) {
   return SERVER_HUES[index % SERVER_HUES.length]
 }
+
+export function timeRange(start, end) {
+  if (!start) return ''
+  const opts = { hour: '2-digit', minute: '2-digit' }
+  const from = new Date(start * 1000)
+  const to = new Date((end || start) * 1000)
+  const day = from.toDateString() === new Date().toDateString()
+    ? '' : `${from.toLocaleDateString([], { month: 'short', day: 'numeric' })}, `
+  const a = from.toLocaleTimeString([], opts)
+  const b = to.toLocaleTimeString([], opts)
+  return a === b ? `${day}${a}` : `${day}${a}–${b}`
+}

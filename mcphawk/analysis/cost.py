@@ -12,7 +12,8 @@ from typing import Any
 
 from mcphawk.protocol import mcp as proto
 from mcphawk.protocol.tokens import estimate_json, estimate_text
-from mcphawk.query import Query, resolve_scope
+from mcphawk.query import Query
+from mcphawk.runs import resolve_scope
 
 LARGE_RESULT_TOKENS = 10_000
 LARGE_DEFINITION_TOKENS = 800
@@ -61,9 +62,9 @@ def context_cost(
     server: str | None = None,
     top: int = 10,
 ) -> dict[str, Any]:
-    sessions = resolve_scope(q, session_id=session_id, run_key=run_key, server=server)
+    scope = resolve_scope(q, session_id=session_id, run_key=run_key, server=server)
     by_server: dict[str, list[str]] = defaultdict(list)
-    for session in sessions:
+    for session in scope.sessions:
         by_server[session["display_name"]].append(session["id"])
 
     servers = []
@@ -75,7 +76,8 @@ def context_cost(
             key=lambda d: d["total"], reverse=True)
         calls: dict[str, dict[str, Any]] = {}
         for session_id_ in ids:
-            for exchange in q.exchanges(session_id=session_id_, method="tools/call"):
+            for exchange in q.exchanges(session_id=session_id_, method="tools/call",
+                                        since=scope.since, until=scope.until):
                 stats = calls.setdefault(exchange["target"] or "?", {
                     "tool": exchange["target"] or "?", "calls": 0, "errors": 0,
                     "result_tokens": 0, "max_result_tokens": 0})

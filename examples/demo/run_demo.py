@@ -1,6 +1,7 @@
 """Generate realistic MCP traffic through `mcphawk wrap`, then open the UI.
 
-    python examples/demo/run_demo.py
+    python examples/demo/run_demo.py            # first task
+    python examples/demo/run_demo.py --second   # run 5+ minutes later: a new agent run
     mcphawk up --open
 
 Runs three servers (one modern 2026-07-28, two with the legacy handshake) from
@@ -26,7 +27,8 @@ def wrapped(name: str) -> StdioServerParameters:
     )
 
 
-async def agent_turns() -> None:
+async def first_task() -> None:
+    """Research a rollback, with a loop and a failing ticket along the way."""
     async with (
         Client(wrapped("weather")) as weather,
         Client(wrapped("docs"), mode="legacy") as docs,
@@ -46,6 +48,19 @@ async def agent_turns() -> None:
         await tickets.call_tool("slow_report", {})
 
 
+async def second_task() -> None:
+    """A later, shorter piece of work: check the weather and file a ticket."""
+    async with (
+        Client(wrapped("weather")) as weather,
+        Client(wrapped("flaky"), mode="legacy") as tickets,
+    ):
+        for client in (weather, tickets):
+            await client.list_tools()
+        await weather.call_tool("forecast", {"city": "Lisbon", "days": 3})
+        await weather.call_tool("get_weather", {"city": "Lisbon"})
+        await tickets.call_tool("create_ticket", {"title": "Offsite weather check"})
+
+
 if __name__ == "__main__":
-    asyncio.run(agent_turns())
+    asyncio.run(second_task() if "--second" in sys.argv else first_task())
     print("Done. Run `mcphawk up --open` to explore the traffic.")

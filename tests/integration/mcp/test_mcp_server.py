@@ -16,8 +16,8 @@ def hawk(db, recorder, monkeypatch):
     monkeypatch.setenv("MCPHAWK_URL", "http://127.0.0.1:9999")
     clock = Clock()
     ids = {
-        "legacy": legacy_session(recorder, clock, run_key="pid:7"),
-        "modern": modern_session(recorder, clock, run_key="pid:7", name="weather"),
+        "legacy": legacy_session(recorder, clock, client_key="pid:7"),
+        "modern": modern_session(recorder, clock, client_key="pid:7", name="weather"),
     }
     return build_server(db), ids
 
@@ -28,7 +28,7 @@ async def test_tools_are_few_and_documented(hawk):
         tools = (await client.list_tools()).tools
         assert sorted(t.name for t in tools) == [
             "compare_sessions", "context_cost", "find_problems", "get_exchange",
-            "get_session", "list_sessions"]
+            "get_session", "list_runs", "list_sessions"]
         assert all(t.description for t in tools)
 
 
@@ -38,7 +38,12 @@ async def test_list_and_get_session(hawk):
         rows = json.loads(text(await client.call_tool("list_sessions", {})))
         assert {r["id"] for r in rows} == set(ids.values())
         assert rows[0]["url"].startswith("http://127.0.0.1:9999/s/")
-        filtered = json.loads(text(await client.call_tool("list_sessions", {"run_key": "pid:7"})))
+        [run] = json.loads(text(await client.call_tool("list_runs", {})))
+        assert run["servers"] == ["weather"]
+        assert run["calls"] == 9
+        assert run["url"].startswith("http://127.0.0.1:9999/r/pid%3A7%40")
+        filtered = json.loads(text(await client.call_tool(
+            "list_sessions", {"run_key": run["run_key"]})))
         assert len(filtered) == 2
 
         session = json.loads(text(await client.call_tool(
@@ -74,7 +79,9 @@ async def test_find_problems_and_cost(hawk):
         bad = text(await client.call_tool("find_problems", {"min_severity": "bad"}))
         assert "min_severity must be" in bad
 
-        cost = json.loads(text(await client.call_tool("context_cost", {"run_key": "pid:7"})))
+        [run] = json.loads(text(await client.call_tool("list_runs", {})))
+        cost = json.loads(text(await client.call_tool("context_cost",
+                                                      {"run_key": run["run_key"]})))
         assert cost["fixed_tokens_per_turn"] > 0
         assert all("session_ids" not in s for s in cost["servers"])
 

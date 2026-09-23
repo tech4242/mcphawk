@@ -102,8 +102,8 @@ class StdioShim:
             raise ValueError("no server command given")
         self.command = command
         self.name = name
-        self.recorder = recorder or Recorder(mask=mask)
         self._mask = mask
+        self.recorder = recorder
         self._stdin = stdin or sys.stdin.buffer
         self._stdout = stdout or sys.stdout.buffer
         self._stderr = stderr or sys.stderr.buffer
@@ -120,19 +120,13 @@ class StdioShim:
             self._stderr.flush()
             return 127
 
-        client = find_client()
-        argv = mask_argv(self.command) if self._mask else self.command
-        self.session_id = self.recorder.open_session(
-            capture="wrap", transport="stdio",
-            name=self.name or os.path.basename(self.command[0]),
-            target=shlex.join(argv), pid=os.getpid(),
-            client_pid=client.pid if client else None,
-            client_app=client.name if client else None,
-            run_key=client.run_key if client else None,
-        )
-        sid = self.session_id
-        to_server = LineFramer(lambda line: self.recorder.record(sid, C2S, line))
-        to_client = LineFramer(lambda line: self.recorder.record(sid, S2C, line))
+        sid = self._open_session()
+        if sid is None:  # recording is unavailable: forward only
+            to_server = LineFramer(lambda _: None)
+            to_client = LineFramer(lambda _: None)
+        else:
+            to_server = LineFramer(lambda line: self.recorder.record(sid, C2S, line))
+            to_client = LineFramer(lambda line: self.recorder.record(sid, S2C, line))
 
         threads = [
             threading.Thread(target=_pump, args=(self._stdin, self.proc.stdin, to_server, True),
@@ -154,8 +148,33 @@ class StdioShim:
         # block on the client forever, so it is not joined.
         for thread in threads[1:]:
             thread.join(timeout=2)
-        self.recorder.end_session(sid)
+        if sid is not None:
+            with contextlib.suppress(Exception):
+                self.recorder.end_session(sid)
         return code
+
+    def _open_session(self) -> str | None:
+        """Start recording; on any failure keep the server usable and say why once."""
+        try:
+            if self.recorder is None:
+                self.recorder = Recorder(mask=self._mask)
+            client = find_client()
+            argv = mask_argv(self.command) if self._mask else self.command
+            self.session_id = self.recorder.open_session(
+                capture="wrap", transport="stdio",
+                name=self.name or os.path.basename(self.command[0]),
+                target=shlex.join(argv), pid=os.getpid(),
+                client_pid=client.pid if client else None,
+                client_app=client.name if client else None,
+                client_key=client.client_key if client else None,
+            )
+            return self.session_id
+        except Exception as exc:
+            self._stderr.write(
+                f"mcphawk: not recording this server ({exc}); traffic is forwarded "
+                "unchanged\n".encode())
+            self._stderr.flush()
+            return None
 
     def terminate(self, *_: object) -> None:
         if self.proc and self.proc.poll() is None:

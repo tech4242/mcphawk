@@ -19,7 +19,7 @@ _LAUNCHERS = frozenset({
 class ClientProcess:
     pid: int
     name: str
-    run_key: str
+    client_key: str
 
 
 _VERSION_LIKE = re.compile(r"^v?\d+(\.\d+)+")
@@ -71,7 +71,7 @@ def find_client(start_pid: int | None = None, max_depth: int = 8) -> ClientProce
         return ClientProcess(
             pid=proc.pid,
             name=_display_name(proc),
-            run_key=f"pid:{proc.pid}:{int(proc.create_time())}",
+            client_key=f"pid:{proc.pid}:{int(proc.create_time())}",
         )
     except (psutil.Error, OSError):
         return None

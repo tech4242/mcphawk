@@ -133,16 +133,14 @@ def test_mcphawk_own_server_is_hidden(db, recorder):
     assert rows(db, "SELECT hidden FROM sessions")[0]["hidden"] == 1
 
 
-def test_end_session_run_key_and_callback(db):
+def test_end_session_and_callback(db):
     seen = []
     rec = Recorder(db, on_record=seen.append)
-    sid = rec.open_session(capture="wrap", transport="stdio")
-    rec.set_run_key(sid, "pid:1")
-    rec.set_run_key(sid, "pid:2")
+    sid = rec.open_session(capture="wrap", transport="stdio", client_key="pid:1")
     rec.record(sid, C2S, frame(id=1, method="x"))
     rec.end_session(sid, ts=5.0)
-    session = rows(db, "SELECT run_key, ended_at FROM sessions")[0]
-    assert session == {"run_key": "pid:1", "ended_at": 5.0}
+    session = rows(db, "SELECT client_key, ended_at FROM sessions")[0]
+    assert session == {"client_key": "pid:1", "ended_at": 5.0}
     assert seen == [{"session_id": sid, "message_id": 1}]
     rec.close()
 

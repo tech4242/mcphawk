@@ -11,7 +11,7 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from mcphawk import links
+from mcphawk import links, runs
 from mcphawk.analysis import cost, drift, problems
 from mcphawk.query import Query
 
@@ -21,8 +21,9 @@ HARD_MAX_CHARS = 40_000
 INSTRUCTIONS = """\
 MCPHawk records real traffic between MCP clients and servers. Use it to see
 what tools were actually called, what failed, and what each server costs in
-context. Start with list_sessions or find_problems; drill into an exchange
-with get_exchange. Every result links to the MCPHawk web UI - share the link
+context. A run is everything one client (e.g. Claude Code) did in one stretch
+of work across all its servers. Start with list_runs or find_problems; drill
+into an exchange with get_exchange. Every result links to the MCPHawk web UI - share the link
 when pointing the user at something.
 """
 
@@ -66,10 +67,28 @@ def build_server(db: Path | str | None = None) -> MCPServer:
     server = MCPServer("mcphawk", instructions=INSTRUCTIONS, version="1.0.0")
 
     @server.tool()
+    def list_runs(limit: int = 10) -> str:
+        """Recent agent runs, newest first: which client, when, which servers, how many
+        calls failed. Pass a run_key to find_problems, context_cost or list_sessions."""
+        rows = []
+        for run in runs.list_runs(q, limit=min(limit, 50)):
+            rows.append({
+                "run_key": run["run_key"], "client": run["client"], "live": run["live"],
+                "started_at": run["started_at"], "last_seen_at": run["last_seen_at"],
+                "servers": run["servers"], "calls": run["exchange_count"],
+                "failed": run["error_count"], "url": links.run_url(run["run_key"]),
+            })
+        return _dump(rows, DEFAULT_MAX_CHARS)
+
+    @server.tool()
     def list_sessions(server_name: str | None = None, run_key: str | None = None,
                       limit: int = 20) -> str:
-        """Recent captured sessions (one per client<->server connection), newest first."""
-        sessions = q.list_sessions(server=server_name, run_key=run_key, limit=min(limit, 100))
+        """Recent captured sessions (one per client<->server connection), newest first.
+        run_key limits them to one agent run."""
+        if run_key:
+            sessions = runs.resolve_scope(q, run_key=run_key).sessions[:min(limit, 100)]
+        else:
+            sessions = q.list_sessions(server=server_name, limit=min(limit, 100))
         return _dump([_session_row(s) for s in sessions], DEFAULT_MAX_CHARS)
 
     @server.tool()

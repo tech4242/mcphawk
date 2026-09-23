@@ -10,8 +10,8 @@ from tests.traffic import Clock, legacy_session, modern_session
 @pytest.fixture
 def client(db, recorder):
     clock = Clock()
-    legacy_session(recorder, clock, run_key="pid:1", client_app="claude")
-    modern_session(recorder, clock, run_key="pid:1", client_app="claude", name="search")
+    legacy_session(recorder, clock, client_key="pid:1", client_app="claude")
+    modern_session(recorder, clock, client_key="pid:1", client_app="claude", name="search")
     app = create_app(db, upstreams=lambda: {"demo": "http://127.0.0.1:1/mcp"}, with_mcp=False,
                      static_dir=None)
     with TestClient(app, base_url="http://127.0.0.1:8484") as c:
@@ -27,8 +27,9 @@ def test_read_api(client):
     assert stats["proxies"] == {"demo": "http://127.0.0.1:1/mcp"}
 
     [run] = client.get("/api/runs").json()
-    assert run["run_key"] == "pid:1"
-    detail = client.get("/api/runs/pid:1").json()
+    assert run["run_key"].startswith("pid:1@")
+    assert run["client"] == "Claude Code"
+    detail = client.get(f"/api/runs/{run['run_key']}").json()
     assert len(detail["sessions"]) == 2
     assert client.get("/api/runs/nope").status_code == 404
 
@@ -53,7 +54,9 @@ def test_analysis_api(client):
     problems = client.get("/api/problems").json()
     assert problems["summary"]["error"] >= 2
     assert client.get("/api/problems", params={"min_severity": "loud"}).status_code == 422
-    cost = client.get("/api/cost", params={"run_key": "pid:1"}).json()
+    run_key = client.get("/api/runs").json()[0]["run_key"]
+    assert len(client.get("/api/sessions", params={"run_key": run_key}).json()) == 2
+    cost = client.get("/api/cost", params={"run_key": run_key}).json()
     assert {s["server"] for s in cost["servers"]} == {"weather", "search"}
     sessions = [s["id"] for s in client.get("/api/sessions").json()]
     compare = client.get("/api/compare", params={"before": sessions[1], "after": sessions[0]})

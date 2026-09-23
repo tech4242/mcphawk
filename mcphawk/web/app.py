@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.routing import Route
 
 from mcphawk import links
+from mcphawk import runs as agent_runs
 from mcphawk.analysis import cost, drift, lint, problems
 from mcphawk.capture.http_proxy import Proxy
 from mcphawk.install import installer
@@ -103,16 +104,18 @@ def create_app(
 
     @app.get("/api/runs")
     def runs(limit: int = 50) -> list[dict[str, Any]]:
-        return q.list_runs(limit=limit)
+        return agent_runs.list_runs(q, limit=limit)
 
     @app.get("/api/runs/{run_key:path}")
     def run(run_key: str) -> dict[str, Any]:
-        return need(q.get_run(run_key), "run")
+        return need(agent_runs.get_run(q, run_key), "run")
 
     @app.get("/api/sessions")
     def sessions(run_key: str | None = None, server: str | None = None,
                  limit: int = 100) -> list[dict[str, Any]]:
-        return q.list_sessions(run_key=run_key, server=server, limit=limit)
+        if run_key:
+            return agent_runs.resolve_scope(q, run_key=run_key).sessions
+        return q.list_sessions(server=server, limit=limit)
 
     @app.get("/api/sessions/{session_id}")
     def session(session_id: str) -> dict[str, Any]:

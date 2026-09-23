@@ -134,7 +134,7 @@ def test_pump_reads_without_read1():
 def test_find_client_walks_past_launchers():
     me = process.find_client(os.getpid())
     assert me is not None
-    assert me.run_key.startswith("pid:")
+    assert me.client_key.startswith("pid:")
     assert process.find_client(2**22 + 11) is None
 
 
@@ -159,7 +159,7 @@ def test_find_client_skips_launcher_chain(monkeypatch):
     chain = Proc(12, "uvx", Proc(11, "sh", client))
     monkeypatch.setattr(process.psutil, "Process", lambda pid: chain)
     found = process.find_client(12)
-    assert (found.pid, found.name, found.run_key) == (10, "node", "pid:10:5")
+    assert (found.pid, found.name, found.client_key) == (10, "node", "pid:10:5")
 
     orphan = Proc(20, "uv", Proc(1, "launchd"))
     monkeypatch.setattr(process.psutil, "Process", lambda pid: orphan)
@@ -211,3 +211,24 @@ def test_find_client_uses_argv0_for_version_titled_processes(monkeypatch):
                           (None, "2.1.280"), ([""], "2.1.280")):
         monkeypatch.setattr(process.psutil, "Process", lambda pid, c=cmd: Proc(c))
         assert process.find_client(70).name == expected
+
+
+def test_recording_failure_never_breaks_the_server(db, monkeypatch):
+    class Broken:
+        def open_session(self, **kwargs):
+            raise RuntimeError("no such column: client_key")
+
+    request = lines({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {}})
+    shim, code, out, err = run_shim(Broken(), request)
+    assert code == 0
+    assert b'"id": 1' in out  # the server still answered
+    assert b"not recording this server (no such column: client_key)" in err
+
+    monkeypatch.setattr(stdio, "Recorder", lambda mask: (_ for _ in ()).throw(
+        OSError("disk full")))
+    stdout, stderr = io.BytesIO(), io.BytesIO()
+    default = StdioShim([sys.executable, SERVER], stdin=io.BytesIO(request),
+                        stdout=stdout, stderr=stderr)
+    assert default.run() == 0
+    assert b"disk full" in stderr.getvalue()
+    assert b'"id": 1' in stdout.getvalue()

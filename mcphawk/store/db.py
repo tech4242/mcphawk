@@ -15,7 +15,7 @@ SCHEMA_VERSION = 1
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
     id               TEXT PRIMARY KEY,
-    run_key          TEXT,
+    client_key       TEXT,
     name             TEXT,
     capture          TEXT NOT NULL,
     transport        TEXT NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     ended_at         REAL,
     hidden           INTEGER NOT NULL DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS idx_sessions_run ON sessions(run_key, started_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_client ON sessions(client_key, started_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(started_at);
 
 CREATE TABLE IF NOT EXISTS exchanges (

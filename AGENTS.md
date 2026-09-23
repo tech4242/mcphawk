@@ -26,6 +26,8 @@ capture/  -> store/recorder.py -> SQLite -> query.py + analysis/ -> web/app.py, 
 - `protocol/`: JSON-RPC framing, MCP semantics for both eras, secret masking, token estimates
 - `store/recorder.py`: request/response pairing, multi round-trip chains, client/server identity
 - `query.py`: the one read layer; the web API and the MCP server must not query SQL themselves
+- `runs.py`: agent runs, computed at read time (client group, split at 5 min idle gaps).
+  `sessions.client_key` stores only which client process a session belongs to
 - `install/`: client config locations and install/uninstall
 - `frontend/`: Vue 3 app, built into `mcphawk/web/static` (committed)
 

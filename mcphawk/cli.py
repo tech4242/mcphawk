@@ -155,6 +155,20 @@ def proxy(
                 log_level="warning")
 
 
+def _tilde(text: str) -> str:
+    """Show paths under the home directory as ~/..."""
+    home = str(Path.home())
+    return text.replace(home + os.sep, "~" + os.sep) if home != os.sep else text
+
+
+_ACTION_TEXT = {
+    installer.WRAP: "recorded (stdio wrapper)",
+    installer.PROXY: "recorded (HTTP proxy)",
+    installer.UNWRAP: "restored",
+    installer.UNPROXY: "restored",
+}
+
+
 def _print_plan(changes: list[installer.Change]) -> None:
     if not changes:
         typer.echo("No MCP client configurations found.")
@@ -163,11 +177,12 @@ def _print_plan(changes: list[installer.Change]) -> None:
     for change in changes:
         label = change.table.label()
         if label != current:
-            typer.echo(f"\n{label}  {change.table.path}")
+            typer.echo(f"\n{label}  {_tilde(str(change.table.path))}")
             current = label
-        mark = {"wrap": "+", "proxy": "+", "unwrap": "-", "unproxy": "-"}.get(change.action, " ")
-        detail = change.action if change.after is not None else change.reason
-        typer.echo(f"  {mark} {change.server:<28} {detail}")
+        if change.after is not None:
+            typer.echo(f"  + {change.server:<24} {_ACTION_TEXT[change.action]}")
+        else:
+            typer.echo(f"    {change.server:<24} skipped: {change.reason}")
 
 
 def _run_plan(uninstall: bool, clients: list[str] | None, project: Path | None,
@@ -188,13 +203,18 @@ def _run_plan(uninstall: bool, clients: list[str] | None, project: Path | None,
     if not effective:
         typer.echo("\nNothing to change.")
         return
+    verb = "restored" if uninstall else "recorded"
+    skipped = len(changes) - len(effective)
+    summary = f"{len(effective)} server(s) will be {verb}" + (
+        f", {skipped} skipped" if skipped else "")
     if dry_run:
-        typer.echo(f"\n{len(effective)} change(s) planned (dry run, nothing written).")
+        typer.echo(f"\n{summary}. Dry run: nothing was written.")
         return
-    if not yes and not typer.confirm(f"\nApply {len(effective)} change(s)?", default=True):
+    if not yes and not typer.confirm(f"\n{summary}. Continue?", default=True):
         raise typer.Exit(1)
+    typer.echo("")
     for note in installer.apply(changes, registry):
-        typer.echo(note)
+        typer.echo(_tilde(note))
     typer.echo("\nRestart your MCP clients to pick up the change.")
     if not uninstall and any(c.action == installer.PROXY for c in effective):
         typer.echo("HTTP servers now go through MCPHawk: keep `mcphawk up` running.")
@@ -236,7 +256,7 @@ def status() -> None:
     q = Query()
     stats = q.stats()
     q.close()
-    typer.echo(f"database   {db_path()}")
+    typer.echo(f"database   {_tilde(str(db_path()))}")
     typer.echo(f"captured   {stats.get('sessions', 0)} sessions, "
                f"{stats.get('exchanges', 0)} calls, {stats.get('errors', 0)} errors")
     routed = [c for c in installer.plan(uninstall=True) if c.after is not None]

@@ -81,7 +81,8 @@ def fake_home(tmp_path, monkeypatch):
 
 def test_install_dry_run_confirm_and_uninstall(fake_home):
     dry = runner.invoke(cli.app, ["install", "--dry-run", "--include-http"])
-    assert "2 change(s) planned" in dry.output
+    assert "2 server(s) will be recorded. Dry run" in dry.output
+    assert "fs                       recorded (stdio wrapper)" in dry.output
     assert json.loads(fake_home.read_text())["mcpServers"]["fs"]["command"] == "npx"
 
     declined = runner.invoke(cli.app, ["install"], input="n\n")
@@ -89,6 +90,8 @@ def test_install_dry_run_confirm_and_uninstall(fake_home):
 
     done = runner.invoke(cli.app, ["install", "--include-http", "--client", "cursor"], input="y\n")
     assert done.exit_code == 0, done.output
+    assert "cursor (user)  ~/.cursor/mcp.json" in done.output
+    assert "updated ~/.cursor/mcp.json" in done.output
     assert "keep `mcphawk up` running" in done.output
     config = json.loads(fake_home.read_text())
     assert config["mcpServers"]["fs"]["command"] == "/bin/mcphawk"

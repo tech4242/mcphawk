@@ -237,7 +237,7 @@ def backup(path: Path) -> Path:
     folder = data_dir() / "backups"
     folder.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
-    parent = path.parent.name.strip(".") or "root"
+    parent = "home" if path.parent == Path.home() else (path.parent.name.strip(".") or "root")
     target = folder / f"{stamp}-{parent}-{path.name}"
     n = 1
     while target.exists():

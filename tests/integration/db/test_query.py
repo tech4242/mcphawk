@@ -1,6 +1,7 @@
 import os
 
-from mcphawk.query import HUNG_AFTER_S, IDLE_AFTER_S, Query, resolve_scope
+from mcphawk.query import HUNG_AFTER_S, IDLE_AFTER_S, Query
+from mcphawk.runs import list_runs
 from mcphawk.store import C2S, S2C
 from tests.traffic import Clock, frame, legacy_session, modern_session
 
@@ -88,27 +89,12 @@ def test_exchange_filters(recorder, query):
     ordered = query.exchanges()
     assert ordered[0]["method"] == "initialize"
     assert ordered[0]["server"] == "weather"
-
-
-def test_runs_group_sessions(recorder, query):
-    clock = Clock()
-    a = legacy_session(recorder, clock, run_key="pid:42", client_app="claude")
-    b = modern_session(recorder, clock, run_key="pid:42", client_app="claude", name="search")
-    solo = legacy_session(recorder, clock, name="solo")
-    runs = {r["run_key"]: r for r in query.list_runs()}
-    assert set(runs) == {"pid:42", f"session:{solo}"}
-    assert runs["pid:42"]["session_count"] == 2
-    assert runs["pid:42"]["servers"] == ["search", "weather"]
-    assert runs["pid:42"]["exchange_count"] == 9
-    assert runs["pid:42"]["client_app"] == "claude"
-
-    run = query.get_run("pid:42")
-    assert [s["id"] for s in run["sessions"]] == [a, b]
-    times = [e["started_at"] for e in run["timeline"]]
-    assert times == sorted(times)
-    assert run["client_app"] == "claude"
-    assert query.get_run(f"session:{solo}")["sessions"][0]["id"] == solo
-    assert query.get_run("pid:0") is None
+    window = query.exchanges(since=ordered[2]["started_at"], until=ordered[3]["started_at"])
+    assert [e["id"] for e in window] == [ordered[2]["id"], ordered[3]["id"]]
+    assert query.exchanges(session_ids=[]) == []
+    assert len(query.exchanges(session_ids=[ordered[0]["session_id"]])) == 5
+    assert len(query.list_sessions(session_ids=[ordered[0]["session_id"]])) == 1
+    assert query.list_sessions(session_ids=[]) == []
 
 
 def test_hidden_sessions_are_excluded(recorder, query):
@@ -116,7 +102,7 @@ def test_hidden_sessions_are_excluded(recorder, query):
     recorder.record(sid, C2S, frame(id=1, method="initialize", params={}))
     recorder.record(sid, S2C, frame(id=1, result={"serverInfo": {"name": "mcphawk"}}))
     assert query.list_sessions() == []
-    assert query.list_runs() == []
+    assert list_runs(query) == []
     assert query.exchanges() == []
     assert query.messages() == []
     assert len(query.list_sessions(include_hidden=True)) == 1
@@ -136,11 +122,3 @@ def test_messages_tail_and_stats(recorder, query):
     query.clear()
     assert query.stats()["messages"] == 0
     assert query.latest_message_id() == 0
-
-
-def test_resolve_scope(recorder, query):
-    sid = legacy_session(recorder, run_key="pid:1")
-    assert [s["id"] for s in resolve_scope(query, session_id=sid)] == [sid]
-    assert resolve_scope(query, session_id="missing") == []
-    assert [s["id"] for s in resolve_scope(query, run_key="pid:1")] == [sid]
-    assert [s["id"] for s in resolve_scope(query)] == [sid]

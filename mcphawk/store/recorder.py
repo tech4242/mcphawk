@@ -78,17 +78,17 @@ class Recorder:
         pid: int | None = None,
         client_pid: int | None = None,
         client_app: str | None = None,
-        run_key: str | None = None,
+        client_key: str | None = None,
         ts: float | None = None,
     ) -> str:
         session_id = uuid.uuid4().hex[:12]
         now = ts or time.time()
         with self._lock:
             self._conn.execute(
-                """INSERT INTO sessions (id, run_key, name, capture, transport, target,
+                """INSERT INTO sessions (id, client_key, name, capture, transport, target,
                        client_app, pid, client_pid, started_at, last_seen_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (session_id, run_key, name, capture, transport,
+                (session_id, client_key, name, capture, transport,
                  mask_text(target) if (target and self._mask) else target,
                  client_app, pid, client_pid, now, now),
             )
@@ -101,14 +101,6 @@ class Recorder:
             self._conn.execute(
                 "UPDATE sessions SET ended_at = ? WHERE id = ?",
                 (ts or time.time(), session_id),
-            )
-            self._conn.commit()
-
-    def set_run_key(self, session_id: str, run_key: str) -> None:
-        with self._lock:
-            self._conn.execute(
-                "UPDATE sessions SET run_key = ? WHERE id = ? AND run_key IS NULL",
-                (run_key, session_id),
             )
             self._conn.commit()
 
