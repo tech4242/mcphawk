@@ -209,7 +209,8 @@ def _print_plan(changes: list[installer.Change]) -> None:
             typer.echo(f"\n{label}  {_tilde(str(change.table.path))}")
             current = label
         if change.after is not None:
-            typer.echo(f"  + {change.server:<24} {_ACTION_TEXT[change.action]}")
+            mark = "-" if change.action in (installer.UNWRAP, installer.UNPROXY) else "+"
+            typer.echo(f"  {mark} {change.server:<24} {_ACTION_TEXT[change.action]}")
         else:
             typer.echo(f"    {change.server:<24} skipped: {change.reason}")
 

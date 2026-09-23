@@ -105,6 +105,7 @@ def test_install_dry_run_confirm_and_uninstall(fake_home):
 
     undone = runner.invoke(cli.app, ["uninstall", "-y"])
     assert undone.exit_code == 0, undone.output
+    assert "  - fs                       restored" in undone.output
     assert json.loads(fake_home.read_text())["mcpServers"]["web"]["url"] == (
         "http://localhost:3000/mcp")
 

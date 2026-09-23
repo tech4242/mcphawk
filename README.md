@@ -189,7 +189,9 @@ Both protocol generations are first-class:
 | `context_cost` | Which servers and tools are eating my context window? |
 | `compare_sessions` | What changed since the last version of my server? |
 
-Every result links into the web UI. Replay is deliberately not exposed to agents.
+Every result links into the web UI. Replay is deliberately not exposed to agents. If you
+run the UI on a port other than 8484, set `MCPHAWK_URL` (e.g. `http://127.0.0.1:9000`) for
+`mcphawk mcp` so its links point to the right place.
 
 ## Privacy and safety
 
