@@ -164,7 +164,7 @@ one `Query` layer and the `analysis` modules.
 1.0 is a rewrite. The database moved to `~/.mcphawk/` with a new schema (old captures are
 not migrated), the Textual/terminal UI is gone, and `mcphawk web` became `mcphawk up`.
 Existing `mcphawk wrap <command>` entries in client configs keep working and are recognised
-by `install`/`uninstall`. See [CHANGELOG.md](CHANGELOG.md).
+by `install`/`uninstall`.
 
 ## License
 

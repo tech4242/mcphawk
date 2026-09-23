@@ -40,7 +40,6 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/tech4242/mcphawk"
 "Bug Tracker" = "https://github.com/tech4242/mcphawk/issues"
-"Changelog" = "https://github.com/tech4242/mcphawk/blob/main/CHANGELOG.md"
 
 [project.scripts]
 mcphawk = "mcphawk.cli:app"
