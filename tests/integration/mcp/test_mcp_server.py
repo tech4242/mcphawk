@@ -1,270 +1,108 @@
-"""Tests for MCP server functionality."""
-
-import asyncio
-import contextlib
 import json
-import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
 
 import pytest
+from mcp.client.client import Client
 
-from mcphawk import logger
-from mcphawk.mcp_server.server import MCPHawkServer
+from mcphawk.mcp_server import DEFAULT_MAX_CHARS, _dump, build_server
+from tests.traffic import Clock, legacy_session, modern_session
 
 
-@pytest.fixture
-def test_db(tmp_path):
-    """Create a temporary test database."""
-    db_path = tmp_path / "test_mcp.db"
-    logger.set_db_path(str(db_path))
-    logger.init_db()
-    yield db_path
+def text(result):
+    return result.content[0].text
 
 
 @pytest.fixture
-def sample_logs(test_db):
-    """Create sample log entries."""
-    test_messages = [
-        {
-            "jsonrpc": "2.0",
-            "method": "tools/list",
-            "id": "req-1"
-        },
-        {
-            "jsonrpc": "2.0",
-            "result": {"tools": ["query", "search"]},
-            "id": "req-1"
-        },
-        {
-            "jsonrpc": "2.0",
-            "method": "progress/update",
-            "params": {"progress": 50}
-        },
-        {
-            "jsonrpc": "2.0",
-            "error": {"code": -32601, "message": "Method not found"},
-            "id": "req-2"
-        }
-    ]
-
-    log_ids = []
-    for i, msg in enumerate(test_messages):
-        log_id = str(uuid.uuid4())
-        log_ids.append(log_id)
-        entry = {
-            "log_id": log_id,
-            "timestamp": datetime.now(tz=timezone.utc),
-            "src_ip": "127.0.0.1",
-            "dst_ip": "127.0.0.1",
-            "src_port": 3000 + i,
-            "dst_port": 8000,
-            "direction": "unknown",
-            "message": json.dumps(msg),
-            "transport_type": "unknown"
-        }
-        logger.log_message(entry)
-
-    return log_ids
+def hawk(db, recorder, monkeypatch):
+    monkeypatch.setenv("MCPHAWK_URL", "http://127.0.0.1:9999")
+    clock = Clock()
+    ids = {
+        "legacy": legacy_session(recorder, clock, client_key="pid:7"),
+        "modern": modern_session(recorder, clock, client_key="pid:7", name="weather"),
+    }
+    return build_server(db), ids
 
 
-class TestMCPServer:
-    """Test MCP server functionality."""
+async def test_tools_are_few_and_documented(hawk):
+    server, _ = hawk
+    async with Client(server) as client:
+        tools = (await client.list_tools()).tools
+        assert sorted(t.name for t in tools) == [
+            "compare_sessions", "context_cost", "find_problems", "get_exchange",
+            "get_session", "list_runs", "list_sessions"]
+        assert all(t.description for t in tools)
 
-    def test_server_initialization(self, test_db):
-        """Test server initializes correctly."""
-        server = MCPHawkServer(str(test_db))
-        assert server.mcp.name == "mcphawk-mcp"
 
-        # Check that FastMCP instance was created
-        assert hasattr(server, 'mcp')
-        assert hasattr(server.mcp, 'tool')
+async def test_list_and_get_session(hawk):
+    server, ids = hawk
+    async with Client(server) as client:
+        rows = json.loads(text(await client.call_tool("list_sessions", {})))
+        assert {r["id"] for r in rows} == set(ids.values())
+        assert rows[0]["url"].startswith("http://127.0.0.1:9999/s/")
+        [run] = json.loads(text(await client.call_tool("list_runs", {})))
+        assert run["servers"] == ["weather"]
+        assert run["calls"] == 9
+        assert run["url"].startswith("http://127.0.0.1:9999/r/pid%3A7%40")
+        filtered = json.loads(text(await client.call_tool(
+            "list_sessions", {"run_key": run["run_key"]})))
+        assert len(filtered) == 2
 
-    def test_list_tools(self, test_db):
-        """Test that tools are registered correctly."""
-        server = MCPHawkServer(str(test_db))
+        session = json.loads(text(await client.call_tool(
+            "get_session", {"session_id": ids["legacy"], "limit": 2})))
+        assert session["shown"] == "last 2 of 5 exchanges"
+        assert session["errors"] == 2
+        assert session["exchanges"][-1]["error"] == "unknown city"
+        assert "No session" in text(await client.call_tool("get_session", {"session_id": "x"}))
 
-        # The FastMCP instance exposes tools through _tool_manager._tools
-        tool_names = list(server.mcp._tool_manager._tools.keys())
 
-        assert len(tool_names) == 5
-        assert "query_traffic" in tool_names
-        assert "get_log" in tool_names
-        assert "search_traffic" in tool_names
-        assert "get_stats" in tool_names
-        assert "list_methods" in tool_names
+async def test_get_exchange_with_chain_and_truncation(hawk, query):
+    server, ids = hawk
+    async with Client(server) as client:
+        retry = [e for e in query.get_session(ids["modern"])["exchanges"]
+                 if e["method"] == "tools/call"][-1]
+        report = json.loads(text(await client.call_tool("get_exchange", {"exchange_id": retry["id"]})))
+        assert report["response"]["result"]["content"][0]["text"] == "Rain"
+        assert [r["status"] for r in report["round_trips"]] == ["input_required", "ok"]
+        assert report["url"] == f"http://127.0.0.1:9999/x/{retry['id']}"
+        small = text(await client.call_tool("get_exchange", {"exchange_id": retry["id"],
+                                                             "max_chars": 10}))
+        assert "truncated" in small
+        assert "No exchange" in text(await client.call_tool("get_exchange", {"exchange_id": 999}))
 
-    @pytest.mark.asyncio
-    async def test_call_tools(self, sample_logs):
-        """Test calling tools directly."""
-        server = MCPHawkServer()
 
-        # Test query_traffic
-        query_tool = server.mcp._tool_manager._tools["query_traffic"]
-        result = await query_tool.fn(limit=2, offset=0)
-        data = json.loads(result)
-        assert len(data) == 2
-        assert all("log_id" in log for log in data)
+async def test_find_problems_and_cost(hawk):
+    server, _ids = hawk
+    async with Client(server) as client:
+        report = json.loads(text(await client.call_tool("find_problems", {})))
+        assert report["summary"]["error"] >= 2
+        assert all("at" not in p for p in report["problems"])
+        assert any(p.get("url", "").startswith("http://127.0.0.1:9999/x/") for p in report["problems"])
+        bad = text(await client.call_tool("find_problems", {"min_severity": "bad"}))
+        assert "min_severity must be" in bad
 
-        # Test get_log
-        get_log_tool = server.mcp._tool_manager._tools["get_log"]
-        result = await get_log_tool.fn(log_id=sample_logs[0])
-        data = json.loads(result)
-        assert data["log_id"] == sample_logs[0]
-        assert "tools/list" in data["message"]
+        [run] = json.loads(text(await client.call_tool("list_runs", {})))
+        cost = json.loads(text(await client.call_tool("context_cost",
+                                                      {"run_key": run["run_key"]})))
+        assert cost["fixed_tokens_per_turn"] > 0
+        assert all("session_ids" not in s for s in cost["servers"])
 
-        # Test get_log with invalid ID
-        result = await get_log_tool.fn(log_id="invalid")
-        assert "No log found" in result
 
-        # Test search_traffic
-        search_tool = server.mcp._tool_manager._tools["search_traffic"]
-        result = await search_tool.fn(search_term="tools/list")
-        data = json.loads(result)
-        assert len(data) == 1
-        assert "tools/list" in data[0]["message"]
+async def test_compare_sessions(hawk):
+    server, ids = hawk
+    async with Client(server) as client:
+        report = json.loads(text(await client.call_tool("compare_sessions", {
+            "before_session_id": ids["legacy"], "after_session_id": ids["modern"]})))
+        assert report["tools"]["removed"] == ["search"]
+        assert report["url"].startswith("http://127.0.0.1:9999/compare?")
+        latest = json.loads(text(await client.call_tool("compare_sessions",
+                                                        {"server_name": "weather"})))
+        assert latest["before"]["id"] == ids["legacy"]
+        missing = json.loads(text(await client.call_tool("compare_sessions",
+                                                         {"server_name": "nobody"})))
+        assert "error" in missing
+        assert "Give" in text(await client.call_tool("compare_sessions", {}))
 
-        # Test get_stats
-        stats_tool = server.mcp._tool_manager._tools["get_stats"]
-        result = await stats_tool.fn()
-        stats = json.loads(result)
-        assert stats["total_logs"] == 4
-        assert stats["requests"] == 1
-        assert stats["responses"] == 1
-        assert stats["notifications"] == 1
-        assert stats["errors"] == 1
 
-        # Test list_methods
-        methods_tool = server.mcp._tool_manager._tools["list_methods"]
-        result = await methods_tool.fn()
-        methods_data = json.loads(result)
-        # The result format is {"methods": [...], "count": 2}
-        assert methods_data["count"] == 2
-        assert "tools/list" in methods_data["methods"]
-        assert "progress/update" in methods_data["methods"]
-
-    @pytest.mark.asyncio
-    async def test_search_with_filters(self, sample_logs):
-        """Test search functionality with various filters."""
-        server = MCPHawkServer()
-
-        search_tool = server.mcp._tool_manager._tools["search_traffic"]
-
-        # Test message type filter
-        result = await search_tool.fn(
-            search_term="jsonrpc",
-            message_type="notification"
-        )
-        data = json.loads(result)
-        assert len(data) == 1
-        assert "progress/update" in data[0]["message"]
-
-        # Test traffic type filter
-        result = await search_tool.fn(
-            search_term="jsonrpc",
-            transport_type="unknown"
-        )
-        data = json.loads(result)
-        # All 4 test messages match the search criteria
-        assert len(data) == 4
-        assert all(log["transport_type"] == "unknown" for log in data)
-
-    @pytest.mark.asyncio
-    async def test_error_handling(self, test_db):
-        """Test error handling in tool functions."""
-        server = MCPHawkServer(str(test_db))
-
-        # The SDK handles parameter validation automatically
-        # So we'll test the actual error cases in the tool implementations
-
-        get_log_tool = server.mcp._tool_manager._tools["get_log"]
-
-        # Test with non-existent log ID
-        result = await get_log_tool.fn(log_id="non-existent-id")
-        assert "No log found with ID" in result
-
-    @pytest.mark.asyncio
-    async def test_run_stdio(self):
-        """Test that run_stdio properly handles stdio transport."""
-        server = MCPHawkServer()
-
-        # Mock the run_stdio_async method to avoid actual stdio operations
-        with patch.object(server.mcp, 'run_stdio_async', new_callable=AsyncMock) as mock_run:
-            await server.run_stdio()
-
-            # Verify run was called
-            mock_run.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_run_http(self, test_db):
-        """Test that run_http properly handles HTTP transport."""
-        server = MCPHawkServer(str(test_db))
-
-        # Create test server config that immediately shuts down
-        with patch('uvicorn.Server') as mock_server_class:
-            mock_server_instance = AsyncMock()
-            mock_server_instance.serve = AsyncMock()
-            mock_server_class.return_value = mock_server_instance
-
-            # Run the server in a task that we'll cancel
-            task = asyncio.create_task(server.run_http(port=8765))
-
-            # Give it a moment to set up
-            await asyncio.sleep(0.1)
-
-            # Cancel the task
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
-
-            # Verify uvicorn was configured correctly
-            mock_server_class.assert_called_once()
-            config = mock_server_class.call_args[0][0]
-            assert config.host == "127.0.0.1"
-            assert config.port == 8765
-
-    @pytest.mark.asyncio
-    async def test_fastmcp_integration(self, sample_logs):
-        """Test that FastMCP handles requests correctly."""
-        server = MCPHawkServer()
-
-        # Test that we can access tool metadata
-        query_tool = server.mcp._tool_manager._tools["query_traffic"]
-        assert query_tool.description
-        # Tool has parameters but not exposed as input_schema
-        assert hasattr(query_tool, 'fn')
-
-        # Test tool execution
-        result = await query_tool.fn(limit=1, offset=0)
-        data = json.loads(result)
-        assert len(data) == 1
-        assert "log_id" in data[0]
-
-    @pytest.mark.asyncio
-    async def test_notification_handling_concept(self):
-        """Test the concept of notification handling (SDK handles the actual protocol)."""
-        # The FastMCP SDK handles JSON-RPC protocol details including notifications
-        # This test verifies our understanding of the concept
-
-        # In JSON-RPC 2.0:
-        # - Requests have an 'id' field and expect a response
-        # - Notifications have no 'id' field and should not receive a response
-
-        notification = {
-            "jsonrpc": "2.0",
-            "method": "progress/update",
-            "params": {"progress": 50}
-            # Note: no 'id' field
-        }
-
-        request = {
-            "jsonrpc": "2.0",
-            "method": "tools/list",
-            "params": {},
-            "id": 1
-        }
-
-        # Verify our test data structure
-        assert "id" not in notification
-        assert "id" in request
-
+def test_dump_truncates():
+    assert _dump({"a": 1}, 100) == json.dumps({"a": 1}, indent=1)
+    long = _dump({"a": "x" * (DEFAULT_MAX_CHARS * 2)}, DEFAULT_MAX_CHARS)
+    assert long.endswith("more chars)")

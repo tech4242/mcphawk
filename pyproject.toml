@@ -1,25 +1,46 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcphawk"
-version = "0.4.3"
-description = "MCPHawk is a Logging & Monitoring solution for MCP traffic, providing deep visibility into MCP client-server interactions"
+version = "1.0.0"
+description = "DevTools for MCP: see the real traffic between your MCP clients and servers, what it costs in context, and what went wrong."
 authors = [
   { name = "tech4242" }
 ]
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
+keywords = ["mcp", "model-context-protocol", "debugging", "devtools", "llm", "agents"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Web Environment",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Debuggers",
+]
 dependencies = [
-  "scapy>=2.5.0",
-  "psutil>=6.0.0",
-  "typer>=0.12.0",
   "fastapi>=0.116.1",
+  "httpx>=0.28.1",
+  "mcp>=2.2.0,<3",
+  "psutil>=6.0.0",
+  "scapy>=2.5.0",
+  "typer>=0.16.0",
   "uvicorn[standard]>=0.35.0",
-  "mcp>=1.0.0",
-  "websockets>=12.0"
+  "websockets>=12.0",
+]
+
+[project.optional-dependencies]
+otel = [
+  "opentelemetry-sdk>=1.30.0",
+  "opentelemetry-exporter-otlp-proto-http>=1.30.0",
 ]
 
 [project.urls]
@@ -67,8 +88,8 @@ exclude = [
 # Same as Black
 line-length = 88
 
-# Assume Python 3.9
-target-version = "py39"
+# Oldest supported Python
+target-version = "py310"
 
 [tool.ruff.lint]
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default
@@ -92,7 +113,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "test_*.py" = ["S101", "E712"]
 "tests/*.py" = ["S101", "E712"]
 "tests/**/*.py" = ["S101", "E712"]
-# Ignore Typer argument pattern in CLI
+# Typer declares options as argument defaults
 "mcphawk/cli.py" = ["B008"]
 
 [tool.pytest.ini_options]
@@ -100,10 +121,13 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
-omit = [
-    "mcphawk/models.py",
-    "examples/*",
-    "*/examples/*",
-]
+source = ["mcphawk"]
+omit = ["examples/*", "*/examples/*"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true

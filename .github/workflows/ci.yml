@@ -18,10 +18,10 @@ jobs:
       with:
         python-version: "3.11"
     
-    - name: Install ruff
+    - name: Install ruff (same version as requirements-dev.txt)
       run: |
         python -m pip install --upgrade pip
-        pip install ruff
+        pip install "$(grep '^ruff' requirements-dev.txt)"
     
     - name: Run ruff
       run: |
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
     - uses: actions/checkout@v4
@@ -46,7 +46,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements-dev.txt
         pip install -e .
-        pip install pytest-cov
     
     - name: Run tests with coverage
       run: |
@@ -76,7 +75,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: "20"
+        node-version: "22"
         cache: "npm"
         cache-dependency-path: frontend/package-lock.json
     
@@ -89,6 +88,11 @@ jobs:
       run: |
         cd frontend
         npm run build
+
+    - name: Committed UI build is up to date
+      run: |
+        git diff --stat --exit-code -- mcphawk/web/static || \
+          (echo "Run 'make build-frontend' and commit mcphawk/web/static" && exit 1)
     
     - name: Install Python build dependencies
       run: |

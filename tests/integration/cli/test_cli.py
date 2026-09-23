@@ -1,469 +1,223 @@
-"""Tests for the MCPHawk CLI."""
-
-import logging
-from unittest.mock import patch
+import json
 
 import pytest
 from typer.testing import CliRunner
 
-from mcphawk.cli import app
+from mcphawk import __version__, cli
+from mcphawk.install import clients as cl
+from tests.traffic import legacy_session
 
 runner = CliRunner()
 
 
-@pytest.fixture(autouse=True)
-def mock_init_db():
-    """Mock init_db to avoid database issues in tests."""
-    with patch('mcphawk.cli.init_db'):
-        yield
+def test_version():
+    result = runner.invoke(cli.app, ["--version"])
+    assert result.output.strip() == f"mcphawk {__version__}"
 
 
-def test_cli_help():
-    """Test that CLI help shows all commands."""
-    result = runner.invoke(app, ["--help"])
-    assert result.exit_code == 0
-    assert "sniff" in result.stdout
-    assert "web" in result.stdout
-    assert "mcp" in result.stdout
-    assert "MCPHawk: Passive MCP traffic sniffer + dashboard" in result.stdout
+def test_default_command_runs_up(monkeypatch):
+    calls = []
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: calls.append(kw))
+    result = runner.invoke(cli.app, [])
+    assert result.exit_code == 0, result.output
+    assert calls[0]["port"] == 8484
+    assert "http://127.0.0.1:8484" in result.output
 
 
-def test_sniff_command_help():
-    """Test sniff command help."""
-    result = runner.invoke(app, ["sniff", "--help"])
-    assert result.exit_code == 0
-    assert "Start sniffing MCP traffic" in result.stdout
-    # Check for the actual text that appears (may include ANSI codes)
-    assert "-filter" in result.stdout or "--filter" in result.stdout
-    assert "-debug" in result.stdout or "--debug" in result.stdout
-    assert "Enable debug output" in result.stdout
+def test_up_options(monkeypatch):
+    calls, sniffers = [], []
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: calls.append(kw))
+    monkeypatch.setattr(cli, "_start_sniffer", lambda *a: sniffers.append(a))
+    monkeypatch.setattr(cli.installer, "load_registry", lambda: {"remote": "http://x"})
+    result = runner.invoke(cli.app, ["up", "--port", "9001", "--host", "0.0.0.0",
+                                     "--no-mcp", "--sniff", "3000", "--sniff", "3001"])
+    assert result.exit_code == 0, result.output
+    assert calls[0]["host"] == "0.0.0.0"
+    assert sniffers[0][0] == "tcp port 3000 or tcp port 3001"
+    assert "proxying  remote" in result.output
+    assert "  MCP " not in result.output
 
 
-def test_web_command_help():
-    """Test web command help."""
-    result = runner.invoke(app, ["web", "--help"])
-    assert result.exit_code == 0
-    assert "Start the MCPHawk dashboard" in result.stdout
-    # Check for the actual text that appears (may include ANSI codes)
-    assert "sniffer" in result.stdout  # Will match -no-sniffer regardless of ANSI codes
-    assert "host" in result.stdout  # Will match --host
-    assert "port" in result.stdout  # Will match --port
+def test_wrap_passes_command(monkeypatch):
+    seen = {}
+
+    def fake_run_wrap(command, name=None, mask=True):
+        seen.update(command=command, name=name, mask=mask)
+        return 4
+
+    monkeypatch.setattr("mcphawk.capture.stdio.run_wrap", fake_run_wrap)
+    result = runner.invoke(cli.app, ["wrap", "--name", "fs", "--no-mask", "--",
+                                     "npx", "-y", "server", "--flag"])
+    assert result.exit_code == 4
+    assert seen == {"command": ["npx", "-y", "server", "--flag"], "name": "fs", "mask": False}
+    legacy = runner.invoke(cli.app, ["wrap", "python", "server.py", "--port", "1"])
+    assert seen["command"] == ["python", "server.py", "--port", "1"]
+    assert legacy.exit_code == 4
+    empty = runner.invoke(cli.app, ["wrap"])
+    assert empty.exit_code == 2
 
 
-def test_sniff_command_requires_flags():
-    """Test sniff command requires port, filter, or auto-detect."""
-    result = runner.invoke(app, ["sniff"])
+def test_proxy_command(monkeypatch):
+    calls = []
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: calls.append(kw))
+    result = runner.invoke(cli.app, ["proxy", "--target", "http://x/mcp", "--name", "x"])
+    assert "http://127.0.0.1:8485/p/x" in result.output
+    assert calls[0]["port"] == 8485
+
+
+@pytest.fixture
+def fake_home(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    monkeypatch.setattr(cl.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(cli.installer.Path, "home", lambda: home)
+    cursor = home / ".cursor" / "mcp.json"
+    cursor.parent.mkdir(parents=True)
+    cursor.write_text(json.dumps({"mcpServers": {
+        "fs": {"command": "npx", "args": ["fs"]},
+        "web": {"url": "http://localhost:3000/mcp"}}}))
+    monkeypatch.setattr(cli.installer, "mcphawk_command", lambda: ["/bin/mcphawk"])
+    return cursor
+
+
+def test_install_dry_run_confirm_and_uninstall(fake_home):
+    dry = runner.invoke(cli.app, ["install", "--dry-run", "--include-http"])
+    assert "2 server(s) will be recorded. Dry run" in dry.output
+    assert "fs                       recorded (stdio wrapper)" in dry.output
+    assert json.loads(fake_home.read_text())["mcpServers"]["fs"]["command"] == "npx"
+
+    declined = runner.invoke(cli.app, ["install"], input="n\n")
+    assert declined.exit_code == 1
+
+    done = runner.invoke(cli.app, ["install", "--include-http", "--client", "cursor"], input="y\n")
+    assert done.exit_code == 0, done.output
+    assert "cursor (user)  ~/.cursor/mcp.json" in done.output
+    assert "updated ~/.cursor/mcp.json" in done.output
+    assert "keep `mcphawk up` running" in done.output
+    config = json.loads(fake_home.read_text())
+    assert config["mcpServers"]["fs"]["command"] == "/bin/mcphawk"
+    assert config["mcpServers"]["web"]["url"] == "http://127.0.0.1:8484/p/web"
+
+    status = runner.invoke(cli.app, ["status"])
+    assert "routed     2 server(s)" in status.output
+
+    nothing = runner.invoke(cli.app, ["install", "-y"])
+    assert "Nothing to change" in nothing.output
+
+    undone = runner.invoke(cli.app, ["uninstall", "-y"])
+    assert undone.exit_code == 0, undone.output
+    assert "  - fs                       restored" in undone.output
+    assert json.loads(fake_home.read_text())["mcpServers"]["web"]["url"] == (
+        "http://localhost:3000/mcp")
+
+
+def test_install_rejects_unknown_client_and_empty_home(fake_home, tmp_path, monkeypatch):
+    bad = runner.invoke(cli.app, ["install", "--client", "emacs"])
+    assert bad.exit_code == 2
+    monkeypatch.setattr(cli.installer.Path, "home", lambda: tmp_path / "empty")
+    empty = runner.invoke(cli.app, ["install", "--dry-run"])
+    assert "No MCP client configurations found" in empty.output
+
+
+def test_status_clear_and_sniff_validation(recorder):
+    legacy_session(recorder)
+    status = runner.invoke(cli.app, ["status"])
+    assert "1 sessions, 5 calls, 2 errors" in status.output
+    assert runner.invoke(cli.app, ["clear"], input="n\n").exit_code == 1
+    assert runner.invoke(cli.app, ["clear", "-y"]).output.strip() == "cleared"
+    assert "0 sessions" in runner.invoke(cli.app, ["status"]).output
+    assert runner.invoke(cli.app, ["sniff"]).exit_code == 2
+
+
+def test_sniff_permission_error(monkeypatch):
+    def denied(*a, **kw):
+        raise PermissionError
+
+    monkeypatch.setattr("mcphawk.capture.sniff.run_sniffer", denied)
+    result = runner.invoke(cli.app, ["sniff", "-a"])
     assert result.exit_code == 1
-    assert "You must specify either --port, --filter, or --auto-detect" in result.stdout
-    assert "mcphawk sniff --port 3000" in result.stdout
-    assert "mcphawk sniff --filter 'tcp port 3000 or tcp port 3001'" in result.stdout
-    assert "mcphawk sniff --auto-detect" in result.stdout
+    assert "needs root" in result.output
 
 
-def test_mcp_command_help():
-    """Test mcp command help."""
-    result = runner.invoke(app, ["mcp", "--help"])
+def test_mcp_command(monkeypatch):
+    ran = []
+
+    async def fake_stdio(self):
+        ran.append("stdio")
+
+    from mcp.server.mcpserver import MCPServer
+
+    monkeypatch.setattr(MCPServer, "run_stdio_async", fake_stdio)
+    assert runner.invoke(cli.app, ["mcp"]).exit_code == 0
+    assert ran == ["stdio"]
+    assert runner.invoke(cli.app, ["mcp", "--transport", "carrier-pigeon"]).exit_code == 2
+
+
+def test_sniff_filter_builder():
+    assert cli._sniff_filter(None, "tcp port 1", True) == "tcp port 1"
+    assert cli._sniff_filter([1], None, False) == "tcp port 1"
+    assert cli._sniff_filter(None, None, True) == "tcp"
+    assert cli._sniff_filter(None, None, False) is None
+
+
+def test_web_alias_still_starts_the_ui(monkeypatch):
+    calls = []
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: calls.append(kw))
+    result = runner.invoke(cli.app, ["web", "--web-port", "9100"])
     assert result.exit_code == 0
-    assert "Run MCPHawk MCP server" in result.stdout
-    # Check for transport option (may be formatted as --transport or -transport)
-    assert "transport" in result.stdout
-    assert "stdio or tcp" in result.stdout
-    # Check for mcp port option (may be formatted as --mcp-port, -mcp-port, or broken across lines)
-    assert "mcp" in result.stdout and "port" in result.stdout
-    assert "Port for TCP transport" in result.stdout
+    assert calls[0]["port"] == 9100
+    assert "now `mcphawk up`" in result.output
 
 
-def test_mcp_command_stdio_transport():
-    """Test mcp command with stdio transport."""
-    with patch('mcphawk.cli.MCPHawkServer') as mock_server_class, \
-         patch('mcphawk.cli.asyncio.run') as mock_asyncio_run:
+def test_up_with_otlp(monkeypatch):
+    calls = []
+    monkeypatch.setattr("uvicorn.run", lambda app, **kw: calls.append(app))
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:1")
+    result = runner.invoke(cli.app, ["up", "--otlp-payloads"])
+    assert result.exit_code == 0, result.output
+    assert "OTLP      http://127.0.0.1:1  (with payloads)" in result.output
+    assert "/metrics" in result.output
 
-        mock_server_instance = mock_server_class.return_value
 
-        result = runner.invoke(app, ["mcp", "--transport", "stdio"])
+def test_otlp_requires_the_extra(monkeypatch):
+    monkeypatch.setattr("mcphawk.otel.available", lambda: False)
+    result = runner.invoke(cli.app, ["up", "--otlp"])
+    assert result.exit_code == 2
+    assert "pip install 'mcphawk[otel]'" in result.output
+    assert runner.invoke(cli.app, ["export", "--otlp"]).exit_code == 2
 
-        # Check output
-        assert "Starting MCP server (transport: stdio)" in result.stdout
-        # The debug output with mcpServers only shows up with debug flag
-        # So we don't check for it here
 
-        # Verify server was created and run_stdio was called
-        mock_server_class.assert_called_once()
-        mock_asyncio_run.assert_called_once()
+def test_export_command(monkeypatch, recorder):
+    legacy_session(recorder, client_key="pid:1")
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    sent = {}
 
-        # Verify that asyncio.run was called with the server's run_stdio method
-        assert mock_asyncio_run.called
-        # The coroutine passed should be from run_stdio
-        assert mock_server_instance.run_stdio.called
+    def fake_export(self, run_key=None, session_id=None):
+        sent.update(run=run_key, session=session_id)
+        return {"spans": 5, "logs": 11, "runs": 1}
 
+    from mcphawk.otel.exporter import TelemetryExporter
 
-def test_mcp_command_http_transport():
-    """Test mcp command with HTTP transport."""
-    with patch('mcphawk.cli.MCPHawkServer') as mock_server_class, \
-         patch('mcphawk.cli.asyncio.run') as mock_asyncio_run:
+    monkeypatch.setattr(TelemetryExporter, "export_history", fake_export)
+    result = runner.invoke(cli.app, ["export", "--otlp", "--run", "pid:1@1"])
+    assert result.exit_code == 0, result.output
+    assert "sent 5 spans, 11 log records and 1 run traces to http://localhost:4318" in (
+        result.output)
+    assert sent == {"run": "pid:1@1", "session": None}
+    assert runner.invoke(cli.app, ["export"]).exit_code == 2
 
-        mock_server_instance = mock_server_class.return_value
 
-        result = runner.invoke(app, ["mcp", "--transport", "http", "--mcp-port", "8765"])
+def test_otel_available_detects_missing_packages(monkeypatch):
+    import builtins
 
-        # Check output
-        assert "Starting MCP server (transport: http)" in result.stdout
-        assert "http://localhost:8765/mcp" in result.stdout
-        # curl example only shows in debug mode
+    from mcphawk import otel
 
-        # Verify server was created and run_http was called
-        mock_server_class.assert_called_once()
-        mock_asyncio_run.assert_called_once()
+    real_import = builtins.__import__
 
-        # Verify that asyncio.run was called with the server's run_http method
-        assert mock_asyncio_run.called
-        # The coroutine passed should be from run_http
-        assert mock_server_instance.run_http.called
+    def no_sdk(name, *args, **kwargs):
+        if name.startswith("opentelemetry.sdk"):
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
 
-
-def test_mcp_command_unknown_transport():
-    """Test mcp command with unknown transport."""
-    result = runner.invoke(app, ["mcp", "--transport", "websocket"])
-    assert result.exit_code == 1
-    assert "Unknown transport: websocket" in result.stdout
-
-
-def test_sniff_with_mcp_http():
-    """Test sniff command with MCP HTTP transport."""
-    with patch('mcphawk.cli.start_sniffer') as mock_start_sniffer, \
-         patch('mcphawk.cli.MCPHawkServer'), \
-         patch('mcphawk.cli.threading.Thread') as mock_thread:
-
-        mock_thread_instance = mock_thread.return_value
-
-        result = runner.invoke(app, [
-            "sniff",
-            "--port", "3000",
-            "--with-mcp",
-            "--mcp-transport", "http",
-            "--mcp-port", "8765"
-        ])
-
-        # Check MCP server startup message
-        assert "Starting MCP HTTP server on http://localhost:8765/mcp" in result.stdout
-
-        # Verify thread was started for MCP server
-        mock_thread.assert_called_once()
-        mock_thread_instance.start.assert_called_once()
-
-        # Verify sniffer was called with excluded ports
-        mock_start_sniffer.assert_called_once()
-        call_args = mock_start_sniffer.call_args[1]
-        assert call_args['excluded_ports'] == []
-
-
-def test_sniff_with_mcp_stdio():
-    """Test sniff command with MCP stdio transport."""
-    with patch('mcphawk.cli.start_sniffer') as mock_start_sniffer, \
-         patch('mcphawk.cli.MCPHawkServer'), \
-         patch('mcphawk.cli.threading.Thread'):
-
-        result = runner.invoke(app, [
-            "sniff",
-            "--port", "3000",
-            "--with-mcp",
-            "--mcp-transport", "stdio"
-        ])
-
-        # Check MCP server startup message
-        assert "Starting MCP server on stdio" in result.stdout
-
-        # Verify sniffer was called with empty excluded ports
-        mock_start_sniffer.assert_called_once()
-        call_args = mock_start_sniffer.call_args[1]
-        assert call_args['excluded_ports'] == []
-
-
-def test_web_with_mcp_http():
-    """Test web command with MCP HTTP transport."""
-    with patch('mcphawk.cli.run_web') as mock_run_web, \
-         patch('mcphawk.cli.MCPHawkServer'), \
-         patch('mcphawk.cli.threading.Thread'):
-
-        result = runner.invoke(app, [
-            "web",
-            "--port", "3000",
-            "--with-mcp",
-            "--mcp-transport", "http",
-            "--mcp-port", "8766"
-        ])
-
-        # Check MCP server startup message
-        assert "Starting MCP HTTP server on http://localhost:8766/mcp" in result.stdout
-
-        # Verify web was called with excluded ports
-        mock_run_web.assert_called_once()
-        call_args = mock_run_web.call_args[1]
-        assert call_args['excluded_ports'] == []
-
-
-def test_mcp_command_custom_port():
-    """Test mcp command with custom HTTP port."""
-    with patch('mcphawk.cli.MCPHawkServer') as mock_server_class, \
-         patch('mcphawk.cli.asyncio.run') as mock_asyncio_run:
-
-        mock_server_instance = mock_server_class.return_value
-
-        result = runner.invoke(app, ["mcp", "--transport", "http", "--mcp-port", "9999"])
-
-        # Check output shows custom port
-        assert "Starting MCP server (transport: http)" in result.stdout
-        assert "http://localhost:9999/mcp" in result.stdout
-
-        # Verify server was created
-        mock_server_class.assert_called_once()
-
-        # Verify run_http was called with custom port
-        mock_asyncio_run.assert_called_once()
-        # Check it was called with port=9999
-        assert mock_server_instance.run_http.call_args[1]['port'] == 9999
-
-
-def test_sniff_with_mcp_custom_port():
-    """Test sniff command with MCP on custom port."""
-    with patch('mcphawk.cli.start_sniffer') as mock_start_sniffer, \
-         patch('mcphawk.cli.MCPHawkServer'), \
-         patch('mcphawk.cli.threading.Thread') as mock_thread:
-
-        mock_thread_instance = mock_thread.return_value
-
-        result = runner.invoke(app, [
-            "sniff",
-            "--port", "3000",
-            "--with-mcp",
-            "--mcp-transport", "http",
-            "--mcp-port", "7777"
-        ])
-
-        # Check MCP server startup message with custom port
-        assert "Starting MCP HTTP server on http://localhost:7777/mcp" in result.stdout
-
-        # Verify thread was started for MCP server
-        mock_thread.assert_called_once()
-        mock_thread_instance.start.assert_called_once()
-
-        # Verify sniffer was called with custom port excluded
-        mock_start_sniffer.assert_called_once()
-        call_args = mock_start_sniffer.call_args[1]
-        assert call_args['excluded_ports'] == []
-
-
-def test_mcp_stdio_ignores_port():
-    """Test that stdio transport ignores the mcp-port parameter."""
-    with patch('mcphawk.cli.MCPHawkServer') as mock_server_class, \
-         patch('mcphawk.cli.asyncio.run'):
-
-        mock_server_instance = mock_server_class.return_value
-
-        # Even with --mcp-port specified, stdio should ignore it
-        result = runner.invoke(app, ["mcp", "--transport", "stdio", "--mcp-port", "9999"])
-
-        # Check output doesn't mention the port
-        assert "Starting MCP server (transport: stdio)" in result.stdout
-        assert "9999" not in result.stdout
-        # mcpServers only shows in debug output
-
-        # Verify run_stdio was called (not run_http)
-        assert mock_server_instance.run_stdio.called
-        assert not mock_server_instance.run_http.called
-
-
-def test_web_with_mcp_default_vs_custom_port():
-    """Test that default port 8765 is used when not specified."""
-    with patch('mcphawk.cli.run_web') as mock_run_web, \
-         patch('mcphawk.cli.MCPHawkServer') as mock_server_class, \
-         patch('mcphawk.cli.threading.Thread') as mock_thread:
-
-        # Test 1: Default port
-        result = runner.invoke(app, [
-            "web",
-            "--port", "3000",
-            "--with-mcp",
-            "--mcp-transport", "http"
-        ])
-
-        assert "Starting MCP HTTP server on http://localhost:8765/mcp" in result.stdout
-        call_args = mock_run_web.call_args[1]
-        assert call_args['excluded_ports'] == []
-
-        # Reset mocks
-        mock_run_web.reset_mock()
-        mock_server_class.reset_mock()
-        mock_thread.reset_mock()
-
-        # Test 2: Custom port
-        result = runner.invoke(app, [
-            "web",
-            "--port", "3000",
-            "--with-mcp",
-            "--mcp-transport", "http",
-            "--mcp-port", "5555"
-        ])
-
-        assert "Starting MCP HTTP server on http://localhost:5555/mcp" in result.stdout
-        call_args = mock_run_web.call_args[1]
-        assert call_args['excluded_ports'] == []
-
-
-@patch('mcphawk.cli.start_sniffer')
-def test_sniff_command_with_port(mock_start_sniffer):
-    """Test sniff command with port option."""
-    mock_start_sniffer.side_effect = KeyboardInterrupt()
-
-    result = runner.invoke(app, ["sniff", "--port", "3000"])
-    assert result.exit_code == 0
-    assert "Starting sniffer with filter: tcp port 3000" in result.stdout
-    assert "Sniffer stopped." in result.stdout
-    mock_start_sniffer.assert_called_once_with(filter_expr="tcp port 3000", auto_detect=False, debug=False, excluded_ports=[])
-
-
-@patch('mcphawk.cli.start_sniffer')
-def test_sniff_command_custom_filter(mock_start_sniffer):
-    """Test sniff command with custom filter."""
-    mock_start_sniffer.side_effect = KeyboardInterrupt()
-
-    result = runner.invoke(app, ["sniff", "--filter", "tcp port 8080"])
-    assert result.exit_code == 0
-    assert "Starting sniffer with filter: tcp port 8080" in result.stdout
-    mock_start_sniffer.assert_called_once_with(filter_expr="tcp port 8080", auto_detect=False, debug=False, excluded_ports=[])
-
-
-@patch('mcphawk.cli.start_sniffer')
-def test_sniff_command_auto_detect(mock_start_sniffer):
-    """Test sniff command with auto-detect mode."""
-    mock_start_sniffer.side_effect = KeyboardInterrupt()
-
-    result = runner.invoke(app, ["sniff", "--auto-detect"])
-    assert result.exit_code == 0
-    assert "Auto-detect mode: monitoring all TCP traffic for MCP messages" in result.stdout
-    assert "Starting sniffer with filter: tcp" in result.stdout
-    mock_start_sniffer.assert_called_once_with(filter_expr="tcp", auto_detect=True, debug=False, excluded_ports=[])
-
-
-def test_web_command_requires_flags():
-    """Test web command requires port, filter, auto-detect, or no-sniffer."""
-    result = runner.invoke(app, ["web"])
-    assert result.exit_code == 1
-    assert "You must specify either --port, --filter, or --auto-detect (or use --no-sniffer)" in result.stdout
-    assert "mcphawk web --port 3000" in result.stdout
-    assert "mcphawk web --filter 'tcp port 3000 or tcp port 3001'" in result.stdout
-    assert "mcphawk web --auto-detect" in result.stdout
-    assert "mcphawk web --no-sniffer" in result.stdout
-
-
-@patch('mcphawk.cli.run_web')
-def test_web_command_with_port(mock_run_web):
-    """Test web command with port option."""
-    result = runner.invoke(app, ["web", "--port", "3000"])
-    assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp port 3000", auto_detect=False, debug=False, excluded_ports=[], with_mcp=False)
-
-
-@patch('mcphawk.cli.run_web')
-def test_web_command_no_sniffer(mock_run_web):
-    """Test web command with --no-sniffer."""
-    result = runner.invoke(app, ["web", "--no-sniffer"])
-    assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=False, host="127.0.0.1", port=8000, filter_expr=None, auto_detect=False, debug=False, excluded_ports=[], with_mcp=False)
-
-
-@patch('mcphawk.cli.run_web')
-def test_web_command_custom_host_web_port(mock_run_web):
-    """Test web command with custom host and web-port."""
-    result = runner.invoke(app, ["web", "--port", "3000", "--host", "0.0.0.0", "--web-port", "9000"])
-    assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=True, host="0.0.0.0", port=9000, filter_expr="tcp port 3000", auto_detect=False, debug=False, excluded_ports=[], with_mcp=False)
-
-
-@patch('mcphawk.cli.run_web')
-def test_web_command_with_filter(mock_run_web):
-    """Test web command with custom filter."""
-    result = runner.invoke(app, ["web", "--filter", "tcp port 8080 or tcp port 8081"])
-    assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp port 8080 or tcp port 8081", auto_detect=False, debug=False, excluded_ports=[], with_mcp=False)
-
-
-@patch('mcphawk.cli.run_web')
-def test_web_command_auto_detect(mock_run_web):
-    """Test web command with auto-detect mode."""
-    result = runner.invoke(app, ["web", "--auto-detect"])
-    assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp", auto_detect=True, debug=False, excluded_ports=[], with_mcp=False)
-
-
-def test_scapy_warnings_suppressed():
-    """Test that Scapy warnings are suppressed."""
-    # Import should not produce warnings
-
-    # Check that scapy.runtime logger is set to ERROR level
-    scapy_logger = logging.getLogger("scapy.runtime")
-    assert scapy_logger.level == logging.ERROR
-
-
-def test_no_default_command():
-    """Test that running mcphawk without a command shows error."""
-    result = runner.invoke(app, [])
-    assert result.exit_code == 2  # Typer returns 2 for missing command
-    # Should show error message
-    assert "Missing command" in result.stdout
-    assert "Usage:" in result.stdout
-
-
-@patch('mcphawk.cli.start_sniffer')
-def test_sniff_command_with_debug_flag(mock_start_sniffer):
-    """Test sniff command with debug flag."""
-    mock_start_sniffer.side_effect = KeyboardInterrupt()
-
-    result = runner.invoke(app, ["sniff", "--port", "3000", "--debug"])
-    assert result.exit_code == 0
-    mock_start_sniffer.assert_called_once_with(filter_expr="tcp port 3000", auto_detect=False, debug=True, excluded_ports=[])
-
-
-@patch('mcphawk.cli.run_web')
-def test_web_command_with_debug_flag(mock_run_web):
-    """Test web command with debug flag."""
-    result = runner.invoke(app, ["web", "--port", "3000", "--debug"])
-    assert result.exit_code == 0
-    mock_run_web.assert_called_once_with(sniffer=True, host="127.0.0.1", port=8000, filter_expr="tcp port 3000", auto_detect=False, debug=True, excluded_ports=[], with_mcp=False)
-
-
-@patch('mcphawk.cli.run_web')
-@patch('mcphawk.cli.MCPHawkServer')
-@patch('mcphawk.cli.threading.Thread')
-def test_web_command_with_mcp(mock_thread, mock_mcp_server, mock_run_web):
-    """Test web command with MCP server integration."""
-    result = runner.invoke(app, ["web", "--port", "3000", "--with-mcp"])
-    assert result.exit_code == 0
-
-    # Check MCP server was created
-    mock_mcp_server.assert_called_once()
-
-    # Check thread was started
-    mock_thread.assert_called_once()
-    mock_thread.return_value.start.assert_called_once()
-
-    # Check run_web was called with excluded ports
-    # Default MCP transport is HTTP on port 8765
-    # MCPHawk's own MCP traffic is always captured
-    mock_run_web.assert_called_once_with(
-        sniffer=True,
-        host="127.0.0.1",
-        port=8000,
-        filter_expr="tcp port 3000",
-        auto_detect=False,
-        debug=False,
-        excluded_ports=[],  # No longer excluding MCP port
-        with_mcp=True,
-    )
-
-
-def test_mcp_command():
-    """Test standalone MCP command."""
-    result = runner.invoke(app, ["mcp", "--help"])
-    assert result.exit_code == 0
-    assert "Run MCPHawk MCP server standalone" in result.stdout
+    assert otel.available()
+    monkeypatch.setattr(builtins, "__import__", no_sdk)
+    assert not otel.available()

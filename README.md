@@ -1,352 +1,267 @@
 <div align="center">
   <img src="examples/branding/mcphawk_logo.png" alt="MCPHawk Logo" height="130">
-  
+
   [![CI](https://github.com/tech4242/mcphawk/actions/workflows/ci.yml/badge.svg)](https://github.com/tech4242/mcphawk/actions/workflows/ci.yml)
   [![codecov](https://codecov.io/gh/tech4242/mcphawk/branch/main/graph/badge.svg)](https://codecov.io/gh/tech4242/mcphawk)
+  [![PyPI](https://img.shields.io/pypi/v/mcphawk.svg)](https://pypi.org/project/mcphawk/)
   [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-  [![Typer](https://img.shields.io/badge/CLI-Typer-informational?style=flat&logo=python&color=2bbc8a)](https://typer.tiangolo.com/)
-  [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
-  [![Vue.js](https://img.shields.io/badge/vue.js-3.x-brightgreen.svg)](https://vuejs.org/)
-  [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-  [![PEP8](https://img.shields.io/badge/code%20style-pep8-orange.svg)](https://www.python.org/dev/peps/pep-0008/)
+  [![MCP](https://img.shields.io/badge/MCP-2026--07--28-8A2BE2)](https://modelcontextprotocol.io/specification/2026-07-28)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
-MCPHawk is a new Logging & Monitoring solution for **Model Context Protocol (MCP)** traffic, providing deep visibility into MCP client-server interactions. It started off as a mix between Wireshark and mcpinspector, purpose-built for the MCP ecosystem, and is now slowly turning into something more.
+**MCPHawk is DevTools for the Model Context Protocol.** It records the real traffic
+between your MCP clients (Claude Code, Claude Desktop, Cursor, VS Code, your own agent)
+and their servers, and shows it the way a browser's network tab would: every call your
+agent made, in order, across all its servers, with what it cost and what went wrong.
 
-**Key Capabilities:**
-- **Protocol-Aware Capture**: Understands MCP's JSON-RPC 2.0 transport layer, capturing and reassembling messages from stdio pipes and HTTP streams
-- **Transport Agnostic**: Monitors MCP traffic across all standard transports (stdio, HTTP Streaming, HTTP+SSE)
-- **Full Message Reconstruction**: Advanced stream reassembly handles fragmented packets, chunked HTTP transfers, SSE streams, and stdio pipes
+The same data is available to your agent: add MCPHawk as an MCP server and Claude Code can
+find the failing call, read it, fix your server and check again, linking you to exactly
+what it looked at.
 
-<img src="examples/branding/mcphawk_screenshot.png" alt="MCPHawk Screenshot" width="100%">
+<img src="docs/images/timeline.jpg" alt="An agent run in MCPHawk: every call across three MCP servers on one timeline, with one call open in the inspector" width="100%">
 
-## Core Features
-
-### 🔍 MCP Protocol Analysis
-- **Complete JSON-RPC 2.0 Support**: Correctly identifies and categorizes all MCP message types
-  - **Requests**: Method calls with unique IDs for correlation
-  - **Responses**: Success results and error responses with matching IDs  
-  - **Notifications**: Fire-and-forget method calls without IDs
-  - **Batch Operations**: Support for JSON-RPC batch requests/responses
-- **Transport-Specific Handling**: See MCP Transport Support table below for full details
-  - **Chunked Transfer**: Handles HTTP chunked transfer encoding transparently
-- **Protocol Compliance**: Validates JSON-RPC 2.0 structure and MCP-specific extensions
-
-### 🚀 Advanced Capture Capabilities
-- **Auto-Discovery Mode**: Intelligently detects MCP traffic on any port using pattern matching
-- **TCP Stream Reassembly**: Reconstructs complete messages from fragmented packets
-- **Multi-Stream Tracking**: Simultaneously monitors multiple MCP client-server connections
-- **IPv4/IPv6 Dual Stack**: Native support for both IP protocols
-- **Zero-Copy Architecture**: Efficient packet processing without client/server overhead
-
-### 📊 Analysis & Visualization
-- **Real-Time Web Dashboard**: Live traffic visualization with WebSocket updates
-- **Message Flow Visualization**: Track request-response pairs using JSON-RPC IDs
-- **Traffic Statistics**: Method frequency, error rates, response times
-- **Search & Filter**: Query by method name, message type, content patterns
-- **Export Capabilities**: Save captured sessions for offline analysis
-
-### 🛠️ Developer Experience
-- **MCP Server Integration**: Query captured data using MCP protocol itself
-  - FastMCP-based implementation for maximum compatibility
-  - Available tools: `query_traffic`, `search_traffic`, `get_stats`, `list_methods`
-  - Supports both stdio and HTTP transports
-- **Multiple Interfaces**:
-  - Web UI for interactive exploration
-  - CLI for scripting and automation  
-  - MCP server for programmatic access
-- **Flexible Deployment**:
-  - Standalone sniffer mode
-  - Integrated web + sniffer
-  - Historical log analysis without active capture
-
-### MCP Transport Support
-
-| Official MCP Transport | Protocol Version | Capture Support | Details |
-|------------------------|------------------|:---------------:|---------|
-| **stdio** | All versions | ✅ Full | Process wrapper transparently captures stdin/stdout between client and server |
-| **HTTP Streaming** | 2025-03-26+ | ✅ Full | HTTP POST with optional SSE streaming responses |
-| **HTTP+SSE** (deprecated) | 2024-11-05 | ✅ Full | Legacy transport with separate SSE endpoint |
-
-Note: Raw TCP traffic with JSON-RPC is also captured and marked as "unknown" transport type
-
-## Comparison with Similar Tools
-
-| Feature                                      | MCPHawk | mcpinspector | Wireshark |
-|-----------------------------------------------|:---------:|:------------:|:---------:|
-| Passive sniffing (no proxy needed)            |     ✅     |      ❌       |     ✅     |
-| MCP/JSON-RPC protocol awareness               |     ✅     |      ✅       |     ❌     |
-| SSE/Chunked HTTP support                      |     ✅     |      ❓       |     ❌     |
-| TCP stream reassembly                         |     ✅     |      ❌       |     ✅     |
-| Auto-detect MCP traffic                       |     ✅     |      ❌       |     ❌     |
-| Web UI for live/historical traffic            |     ✅     |      ✅       |     ❌     |
-| JSON-RPC message type detection               |     ✅     |      ❌       |     ❌     |
-| MCP server for data access                    |     ✅     |      ❌       |     ❌     |
-| No client/server config needed                |     ✅     |      ❌       |     ✅     |
-| Interactive testing/debugging                 |     ❌     |      ✅       |     ❌     |
-| Proxy/MITM capabilities                       |     ✅ (stdio)     |      ✅       |     ❌     |
-
-**When to use each tool:**
-- **MCPHawk**: Passive monitoring, protocol analysis, debugging MCP implementations, understanding traffic patterns
-- **mcpinspector**: Active testing, crafting requests, interactive debugging with proxy
-- **Wireshark**: General network analysis, non-MCP protocols, packet-level inspection
-
-## TLS/HTTPS Limitations
-
-MCPHawk captures **unencrypted** MCP traffic only. It cannot decrypt:
-- HTTPS/WSS (WebSocket Secure) connections
-- TLS-encrypted TCP connections
-- Any SSL/TLS encrypted traffic
-
-**This tool is ideal for:**
-- 🛠️ **Local MCP development** - Debug your MCP server implementations
-- 🔍 **Understanding MCP protocol** - See actual JSON-RPC message flow
-- 🐛 **Troubleshooting local tools** - Monitor Claude Desktop, Cline, etc. with YOUR local MCP servers
-- 📊 **Development/staging environments** - Where TLS is often disabled
-
-## Installation
-
-### For Users
+## Get started in a minute
 
 ```bash
-# Install from PyPI
-pip install mcphawk
-
-# Or install directly from GitHub
-pip install git+https://github.com/tech4242/mcphawk.git
+pip install mcphawk          # or prefix the commands below with `uvx`
+mcphawk install              # route your clients' MCP servers through MCPHawk
+                             # ...restart your MCP clients and use them as usual...
+mcphawk up --open            # open the UI at http://127.0.0.1:8484
 ```
 
-### Requirements
+`mcphawk install` finds the MCP servers of Claude Desktop, Claude Code, Cursor and VS Code,
+backs up each config file, and puts MCPHawk in front of every server it can record without
+getting in the way:
 
-- **macOS/Linux**: Requires `sudo` for packet capture (standard for network sniffers)
-- **Python**: 3.9 or higher
-- **Permissions**: Must run with elevated privileges to access network interfaces
+```text
+claude-desktop (user)  ~/Library/Application Support/Claude/claude_desktop_config.json
+  + filesystem               recorded (stdio wrapper)
+  + github                   recorded (stdio wrapper)
 
-### Quick Start
+claude-code (user)  ~/.claude.json
+  + postgres                 recorded (stdio wrapper)
+  + docs-search              recorded (HTTP proxy)
+    linear                   skipped: remote server without static headers, probably OAuth (--force-http)
+
+cursor (user)  ~/.cursor/mcp.json
+  + playwright               recorded (stdio wrapper)
+    sentry                   skipped: remote server without static headers, probably OAuth (--force-http)
+
+5 server(s) will be recorded, 2 skipped. Continue? [Y/n]:
+```
+
+Nothing else about your servers changes, and `mcphawk uninstall` puts every entry back.
+The **Setup** page shows the same picture at any time:
+
+<img src="docs/images/setup.jpg" alt="The Setup page: which client servers MCPHawk records, and the two commands to get started" width="100%">
+
+Let your agent read the traffic too:
 
 ```bash
-# Get help
-mcphawk --help
-
-# Get help for specific command
-mcphawk sniff --help
-mcphawk web --help
-
-# Start web UI with auto-detect mode (requires sudo on macOS)
-sudo mcphawk web --auto-detect
-
-# Monitor MCP traffic on a specific port (console output)
-sudo mcphawk sniff --port 3000
-
-# Monitor multiple ports with a custom filter
-sudo mcphawk sniff --filter "tcp port 3000 or tcp port 8080"
-
-# Auto-detect MCP traffic on any port
-sudo mcphawk sniff --auto-detect
-
-# Start web UI with sniffer on specific port
-sudo mcphawk web --port 3000
-
-# Start web UI with custom filter for multiple ports
-sudo mcphawk web --filter "tcp port 3000 or tcp port 8080"
-
-# View historical logs only (no active sniffing)
-sudo mcphawk web --no-sniffer
-
-# Custom web server configuration
-sudo mcphawk web --port 3000 --host 0.0.0.0 --web-port 9000
-
-# Enable debug output for troubleshooting
-sudo mcphawk sniff --port 3000 --debug
-sudo mcphawk web --port 3000 --debug
-
-# Wrap an MCP server to capture stdio traffic
-mcphawk wrap /path/to/mcp-server --arg1 --arg2
-
-# Example: Wrap Context7 MCP server to monitor Claude Desktop's documentation lookups
-mcphawk wrap npx -y @upstash/context7-mcp@latest
-
-# Claude Desktop config to use the wrapped version:
-# {
-#   "mcpServers": {
-#     "context7": {
-#       "command": "mcphawk",
-#       "args": ["wrap", "npx", "-y", "@upstash/context7-mcp@latest"]
-#     }
-#   }
-# }
-
-# Start MCP server with Streamable HTTP transport (default)
-mcphawk mcp --transport http --mcp-port 8765
-
-# Start MCP server with stdio transport (for Claude Desktop integration)
-mcphawk mcp --transport stdio
-
-# Start sniffer with integrated MCP server (HTTP transport)
-sudo mcphawk sniff --port 3000 --with-mcp --mcp-transport http
-
-# Start web UI with integrated MCP server
-sudo mcphawk web --port 3000 --with-mcp --mcp-transport http --mcp-port 8765
+claude mcp add mcphawk -- mcphawk mcp
 ```
 
-## MCP Server Integration
+No client handy? `make demo` drives three real MCP servers so the UI has something to show.
 
-MCPHawk includes a built-in MCP server, allowing you to query captured traffic through the Model Context Protocol itself. This creates powerful possibilities:
+## Agent runs
 
-- **AI-Powered Analysis**: Connect Claude or other LLMs to analyze traffic patterns
-- **Automated Monitoring**: Build agents that detect anomalies or specific behaviors
-- **Integration Testing**: Programmatically verify MCP interactions in CI/CD pipelines
+Everything in MCPHawk is organised around **agent runs**. A run is everything one client
+did in one stretch of work, across all of its MCP servers: ask Claude Code to fix a flaky
+test and the filesystem reads, the GitHub calls and the ticket it files all land on one
+timeline, in the order they happened.
 
-<img src="examples/branding/mcphawk_claudedesktop.png" alt="MCPHawk Claude Desktop MCP" width="100%">
+* **One client, all its servers.** stdio servers are tied to the client process that
+  started them; HTTP servers join when they report the same client name at the same time.
+* **Split by pauses.** Five minutes without a single call ends the run, so a Claude Code
+  window that stays open all day becomes one run per task, not one endless log.
+* **Links stay valid.** A run keeps its address as more traffic arrives, so you can paste
+  it into an issue or let the agent hand it to you.
 
-### Available Tools
+Sessions (one client talking to one server) are still there underneath: click a server
+name above the timeline to see just that connection.
 
-The MCP server exposes these tools for traffic analysis:
+## What you can do with it
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `query_traffic` | Fetch captured logs with pagination | `limit`, `offset` |
-| `get_log` | Retrieve specific log entry | `log_id` |
-| `search_traffic` | Search logs by content or type | `search_term`, `message_type`, `traffic_type`, `limit` |
-| `get_stats` | Get traffic statistics | None |
-| `list_methods` | List unique JSON-RPC methods | None |
+### See what the agent actually did
 
-### Transport Options
+The timeline shows every call of a run as a waterfall: which server, which tool, how long
+it took, how big the result was, and whether it failed. Filter by status, or search inside
+request and response payloads. Multi round-trip requests from the 2026-07-28 spec (the
+server asks for input, the client retries) are shown as one chain.
 
-#### HTTP Transport (Development & Testing)
+### Inspect a single call
 
-The HTTP transport uses Server-Sent Events (SSE) for streaming responses:
+Click any call for its details: the tool result rendered the way the model received it
+(text, images, embedded resources), the full request and response, HTTP headers, and a
+link you can share. **Replay** sends the same request again, optionally with edited
+arguments, and records the replay next to the original so you can compare.
+
+<img src="docs/images/inspector.jpg" alt="The call inspector: a tool result with the Replay editor open" width="100%">
+
+### Find out what your servers cost in context
+
+Every tool definition is sent to the model on every turn, whether the tool is used or not.
+**Context cost** estimates the tokens each server and each tool adds per turn, splits
+descriptions from schemas, marks tools that were never called, and lists the results that
+blew up the conversation.
+
+<img src="docs/images/cost.jpg" alt="Context cost: tokens per turn per server, per-tool breakdown and findings" width="100%">
+
+### Know what went wrong, first
+
+**Problems** collects everything worth a look, most severe first: JSON-RPC errors, tool
+errors, calls that never got an answer, slow calls, agents repeating the same call, and spec
+violations for the protocol version each session negotiated (missing `resultType` or cache
+hints, missing `Mcp-Method` headers, stray output on stdout, deprecated features).
+
+<img src="docs/images/problems.jpg" alt="Problems: failed tool calls and a repeated identical call, most severe first" width="100%">
+
+### Catch regressions between versions
+
+**Compare** puts two sessions of a server side by side: tools added, removed or changed
+(with the change in tokens per turn) and how each call's count, errors and latency moved.
+
+### Send it to Grafana, Datadog or any OpenTelemetry backend
+
+MCPHawk streams what it records as OpenTelemetry **metrics, logs and traces** over OTLP,
+using the [OpenTelemetry conventions for MCP](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/mcp.md),
+so MCP traffic shows up next to everything else you monitor. It works for every server
+MCPHawk records, including ones that have no instrumentation of their own.
+
+Try it locally with Grafana's all-in-one OpenTelemetry image:
 
 ```bash
-# Start MCP server
-mcphawk mcp --transport http --mcp-port 8765
-
-# Initialize session (note: returns SSE stream)
-curl -N -X POST http://localhost:8765/mcp \
-  -H 'Accept: text/event-stream' \
-  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
-
-# Example response (SSE format):
-# event: message
-# data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05",...}}
+docker run -p 3000:3000 -p 4318:4318 grafana/otel-lgtm
+pip install 'mcphawk[otel]'
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 mcphawk up --otlp
 ```
 
-#### stdio Transport (Production & Claude Desktop)
+Then import [`examples/grafana/mcphawk-dashboard.json`](examples/grafana/mcphawk-dashboard.json)
+in Grafana (http://localhost:3000): requests, failures, error rate, p95 latency per tool,
+the failing tools, and what each server's tool definitions cost per turn.
 
-For Claude Desktop integration:
+| Signal | What is sent |
+|---|---|
+| Metrics | `mcp.client.operation.duration` (request count, failures by `error.type`, latency), `mcphawk.tool.result.tokens`, `mcphawk.tool.definition.tokens` |
+| Logs | One record per MCP message: method, direction, tool, ids, errors. Payloads only with `--otlp-payloads` (masked, capped) |
+| Traces | One span per call. It joins the agent's own trace when the client sends a `traceparent`; otherwise each agent run is one trace. Every span links back into the MCPHawk UI |
 
-```json
-{
-  "mcpServers": {
-    "mcphawk": {
-      "command": "mcphawk",
-      "args": ["mcp", "--transport", "stdio"]
-    }
-  }
-}
+Configuration uses the standard OpenTelemetry variables (`OTEL_EXPORTER_OTLP_ENDPOINT`,
+`OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_SERVICE_NAME`, ...), so any OTLP backend works, for
+example the Datadog Agent's OTLP receiver. Already run Prometheus? `mcphawk up` also
+serves the same metrics at `http://127.0.0.1:8484/metrics` for scraping, and the dashboard
+works with either. To send past traffic, run `mcphawk export --otlp --run <run key>`.
+
+### Let your agent debug with you
+
+MCPHawk is an MCP server too. Your agent can list runs, read a failing call, check context
+cost and compare versions, and every answer links back into the UI.
+
+## How traffic is captured
+
+| Mode | Command | Works for | Notes |
+|---|---|---|---|
+| **Wrap** (stdio) | `mcphawk wrap -- <server command>` | Any stdio server | What `mcphawk install` sets up. Bytes are forwarded before they are recorded, so capture never slows the client down. |
+| **Proxy** (HTTP) | `mcphawk install --include-http`, or `mcphawk proxy --target URL` | Streamable HTTP and legacy HTTP+SSE, including HTTPS and remote servers | Runs inside `mcphawk up`. Remote servers that use OAuth are skipped by default: their tokens are bound to the server URL. |
+| **Sniff** (passive) | `sudo mcphawk sniff --port 3000` | Plaintext local HTTP or raw TCP | No config change at all, but needs capture privileges and cannot read TLS. |
+
+### Protocol support
+
+Both protocol generations are first-class:
+
+* **2026-07-28 (stateless):** identity from `_meta`, `server/discover`, multi round-trip
+  requests (`input_required` → retry), `subscriptions/listen`, `Mcp-Method`/`Mcp-Name`
+  headers, cache hints.
+* **2024-11-05 to 2025-11-25:** the `initialize` handshake, `Mcp-Session-Id`, legacy
+  HTTP+SSE endpoints, server-initiated sampling, elicitation and roots.
+
+## MCP tools for agents
+
+`mcphawk mcp` (stdio) or `http://127.0.0.1:8484/mcp` while `mcphawk up` runs:
+
+| Tool | Answers |
+|---|---|
+| `list_runs` | What did my agents do recently? |
+| `list_sessions` | Which client talked to which server? |
+| `get_session` | Who talked to whom, and how did each call go? |
+| `get_exchange` | What exactly was sent and returned? (capped, truncation is marked) |
+| `find_problems` | What went wrong, most severe first? |
+| `context_cost` | Which servers and tools are eating my context window? |
+| `compare_sessions` | What changed since the last version of my server? |
+
+Every result links into the web UI. Replay is deliberately not exposed to agents. If you
+run the UI on a port other than 8484, set `MCPHAWK_URL` (e.g. `http://127.0.0.1:9000`) for
+`mcphawk mcp` so its links point to the right place.
+
+## Privacy and safety
+
+* Everything stays on your machine in `~/.mcphawk/mcphawk.db` (`MCPHAWK_DB` to change).
+* Secrets are masked **before** they are stored: auth headers, keys named like
+  `token`/`api_key`/`password`, and common token formats (API keys, JWTs, bearer tokens,
+  private keys). Use `--no-mask` only if you need raw values, for example to replay a call
+  that needs its credentials.
+* The UI binds to `127.0.0.1`. State-changing API calls (replay, clearing data) require a
+  custom header and a localhost `Host`, so other websites cannot trigger them.
+* `mcphawk install` backs up every file it touches to `~/.mcphawk/backups/`, and
+  `uninstall` restores entries structurally, keeping edits you made in between.
+
+## How it compares
+
+| | MCPHawk | [mcpsnoop](https://github.com/kerlenton/mcpsnoop) | [MCP Inspector](https://github.com/modelcontextprotocol/inspector) | [MCP Shark](https://github.com/mcp-shark/mcp-shark) |
+|---|:-:|:-:|:-:|:-:|
+| Real client traffic (Claude, Cursor, …) | ✅ | ✅ | ❌ own client | ✅ |
+| One-command setup for all clients | ✅ | ❌ per server | n/a | ✅ |
+| Passive capture without config changes | ✅ | ❌ | ❌ | ❌ |
+| Web UI | ✅ | ❌ terminal | ✅ | ✅ |
+| Cross-server run timeline | ✅ | ❌ | ❌ | ❌ |
+| Context cost per tool | ✅ | ❌ | ❌ | ❌ |
+| Spec lint per protocol version | ✅ | ✅ | ❌ | ❌ |
+| MCP server so agents can query traffic | ✅ | ❌ | ❌ | ❌ |
+| Replay | ✅ | ✅ | ✅ | ✅ playground |
+| OpenTelemetry (OTLP) export | ✅ | ✅ | ❌ | ❌ |
+| HAR export, CI mode | ❌ not yet | ✅ | ❌ | partial |
+
+Use the Inspector to poke at a server interactively; use MCPHawk to see what really happens
+when your agent uses it.
+
+## CLI
+
+```
+mcphawk up          Web UI, API, proxy, /mcp and /metrics on one port (default command)
+                      --otlp streams metrics, logs and traces to OTEL_EXPORTER_OTLP_ENDPOINT
+mcphawk install     Route client configs through MCPHawk   (--include-http, --dry-run, --client)
+mcphawk uninstall   Restore the original configs
+mcphawk status      Where data lives, what was captured, which servers are routed
+mcphawk wrap        Record one stdio server:  mcphawk wrap --name fs -- npx -y @mcp/fs ~/
+mcphawk proxy       Record one HTTP server:   mcphawk proxy --target https://example.com/mcp
+mcphawk mcp         MCPHawk's own MCP server (stdio or --transport http)
+mcphawk sniff       Passive capture (needs sudo)
+mcphawk export      Send captured traffic to an OpenTelemetry backend (--otlp)
+mcphawk clear       Delete captured traffic
 ```
 
-The stdio transport follows the standard MCP communication pattern:
-1. Client sends `initialize` request
-2. Server responds with capabilities
-3. Client sends `initialized` notification
-4. Normal tool calls can proceed
-
-See [examples/mcp_sdk_client.py](examples/mcp_sdk_client.py) for HTTP client example or [examples/stdio_client.py](examples/stdio_client.py) for stdio communication.
-
-## Platform Support
-
-### Tested Platforms
-- ✅ **macOS** (Apple Silicon & Intel) - Fully tested
-- ✅ **Linux** (Ubuntu, Debian) - Fully tested  
-- ⚠️  **Windows** - Experimental (Scapy should work but untested)
-
-### Known Limitations
-
-- Requires elevated privileges (`sudo`) on macOS/Linux for packet capture
-- Limited to localhost/loopback interface monitoring
-- Cannot decrypt TLS/HTTPS traffic (WSS, HTTPS)
-- IPv6 support requires explicit interface configuration on some systems
-- High traffic volumes (>1000 msgs/sec) may impact performance
-
-### Troubleshooting
-
-**Permission Denied Error:**
-```bash
-# On macOS/Linux, use sudo:
-sudo mcphawk web --auto-detect
-```
-
-**No Traffic Captured:**
-- Ensure the MCP server/client is using localhost (127.0.0.1 or ::1)
-- Check if traffic is on the expected port
-- Try auto-detect mode to find MCP traffic: `--auto-detect`
-- Verify traffic is unencrypted (not HTTPS/TLS)
-- On macOS, ensure Terminal has permission to capture packets in System Preferences
-
-**SSE/HTTP Responses Not Showing:**
-- Confirm the server uses standard SSE format (event: message\ndata: {...}\n\n)
-- Check if responses use chunked transfer encoding
-- Enable debug mode to see detailed packet analysis: `--debug`
-
-## Potential Upcoming Features
-
-Vote for features by opening a GitHub issue!
-
-- [x] **Auto-detect MCP traffic** - Automatically discover MCP traffic on any port without prior configuration
-- [x] **MCP Server Interface** - Expose captured traffic via MCP server for AI agents to query and analyze traffic patterns
-- [x] **Stdio capture** - Transparent process wrapper to capture stdin/stdout communication
-- [ ] **Protocol Version Detection** - Identify and display MCP protocol version from captured traffic
-- [ ] **Smart Search & Filtering** - Search by method name, params, or any JSON field with regex support
-- [ ] **Performance Analytics** - Request/response timing, method frequency charts, and latency distribution
-- [ ] **Export & Share** - Export sessions as JSON/CSV, generate shareable links, create HAR-like files
-- [ ] **Test Generation** - Auto-generate test cases from captured traffic
-- [ ] **Error Analysis** - Highlight errors, group similar issues, show error trends
-- [ ] **Session Management** - Save/load capture sessions, compare sessions side-by-side
-- [ ] **Interactive Replay** - Click any request to re-send it, edit and replay captured messages
-- [ ] **Real-time Alerts** - Alert on specific methods or error patterns with webhook support
-- [ ] **Visualization** - Sequence diagrams, resource heat maps, method dependency graphs
-
-... and a few more off the deep end:
-- [ ] **TLS/HTTPS Support (MITM Proxy Mode)** - Optional man-in-the-middle proxy with certificate installation for encrypted traffic
-- [ ] **External Decryption Integration** - Import decrypted streams from Wireshark, Chrome DevTools, or SSLKEYLOGFILE
-
-## For Developers
-
-```bash
-# Set up Python environment
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install backend dependencies
-pip3 install -r requirements-dev.txt
-pip3 install -e .
-
-# Install frontend dependencies and build
-cd frontend
-npm install
-npm run build
-cd ..
-
-# Run tests
-python3 -m pytest -v
-```
-
-### Some Vue options:
+## Development
 
 ```bash
-# Option 1: Use make (recommended)
-make dev  # Runs both frontend and backend
-
-# Option 2: Run separately
-# Terminal 1 - Frontend with hot reload
-cd frontend && npm run dev
-
-# Terminal 2 - Backend
-mcphawk web --port 3000
-
-# Option 3: Watch mode
-cd frontend && npm run build:watch  # Auto-rebuild on changes
-mcphawk web --port 3000           # In another terminal
+python3 -m venv .venv && source .venv/bin/activate
+make install        # Python deps from requirements-dev.txt + editable install + frontend deps
+make dev            # API on :8484 and the Vite dev server with hot reload on :5173
+make test           # unit + integration tests (coverage must stay above 85%)
+make lint
+make build-frontend # the built UI in mcphawk/web/static is committed
 ```
+
+The architecture in one line: every capture mode feeds a `Recorder` (pairing, chains,
+identity, masking) that writes to SQLite; the web API and the MCP server are thin views over
+one `Query` layer and the `analysis` modules.
+
+## Upgrading from 0.x
+
+1.0 is a rewrite. The database moved to `~/.mcphawk/` with a new schema (old captures are
+not migrated), the Textual/terminal UI is gone, and `mcphawk web` became `mcphawk up`.
+Existing `mcphawk wrap <command>` entries in client configs keep working and are recognised
+by `install`/`uninstall`.
+
+## License
+
+MIT
