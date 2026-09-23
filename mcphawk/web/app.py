@@ -6,9 +6,16 @@ import contextlib
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Body,
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi import Query as Param
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +26,7 @@ from mcphawk.analysis import cost, drift, lint, problems
 from mcphawk.capture.http_proxy import Proxy
 from mcphawk.install import installer
 from mcphawk.query import Query
+from mcphawk.replay import ReplayError, replay
 from mcphawk.store import Recorder
 
 logger = logging.getLogger(__name__)
@@ -26,6 +34,13 @@ logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 LIVE_POLL_S = 0.5
 SEVERITIES = ("error", "warning", "info")
+GUARD_HEADER = "x-mcphawk"
+LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "[::1]"})
+
+
+def _is_local_host(host_header: str) -> bool:
+    host = host_header.rsplit(":", 1)[0] if not host_header.endswith("]") else host_header
+    return host in LOCAL_HOSTS
 
 
 def create_app(
@@ -60,6 +75,20 @@ def create_app(
     app.state.query = q
     app.state.recorder = recorder
     app.state.proxy = proxy
+
+    @app.middleware("http")
+    async def guard_mutations(request: Request, call_next):
+        """State-changing API calls must come from our own UI on localhost.
+
+        The custom header forces a CORS preflight (which we never grant), and
+        the Host check stops DNS-rebinding pages from reaching the API.
+        """
+        mutating = request.method not in ("GET", "HEAD")
+        if request.url.path.startswith("/api/") and mutating and (
+                request.headers.get(GUARD_HEADER) != "1"
+                or not _is_local_host(request.headers.get("host", ""))):
+            return JSONResponse({"detail": "forbidden"}, status_code=403)
+        return await call_next(request)
 
     def need(value: Any, what: str) -> Any:
         if value is None:
@@ -103,7 +132,7 @@ def create_app(
     @app.get("/api/exchanges")
     def exchanges(session_id: str | None = None, status: str | None = None,
                   method: str | None = None, target: str | None = None,
-                  q_: str | None = Param(None, alias="q"),
+                  q_: Annotated[str | None, Param(alias="q")] = None,
                   limit: int = 500) -> list[dict[str, Any]]:
         return q.exchanges(session_id=session_id, status=status, method=method,
                            target=target, text=q_, limit=limit)
@@ -147,6 +176,16 @@ def create_app(
             "status": ("would wrap" if c.action == installer.WRAP
                        else "would proxy" if c.action == installer.PROXY else c.reason),
         } for c in changes]}
+
+    @app.post("/api/exchanges/{exchange_id}/replay")
+    async def replay_exchange(
+        exchange_id: int,
+        params: Annotated[dict[str, Any] | None, Body(embed=True)] = None,
+    ) -> dict[str, Any]:
+        try:
+            return await replay(q, recorder, exchange_id, params)
+        except ReplayError as exc:
+            raise HTTPException(409, str(exc)) from None
 
     @app.delete("/api/data")
     def clear(confirm: bool = False) -> dict[str, Any]:

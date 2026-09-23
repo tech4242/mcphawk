@@ -14,8 +14,11 @@ def client(db, recorder):
     modern_session(recorder, clock, run_key="pid:1", client_app="claude", name="search")
     app = create_app(db, upstreams=lambda: {"demo": "http://127.0.0.1:1/mcp"}, with_mcp=False,
                      static_dir=None)
-    with TestClient(app) as c:
+    with TestClient(app, base_url="http://127.0.0.1:8484") as c:
         yield c
+
+
+GUARD = {"X-MCPHawk": "1"}
 
 
 def test_read_api(client):
@@ -64,8 +67,9 @@ def test_setup_and_clear(client, monkeypatch):
 
     monkeypatch.setattr(installer, "plan", lambda **kw: [])
     assert client.get("/api/setup").json() == {"servers": []}
-    assert client.delete("/api/data").status_code == 400
-    assert client.delete("/api/data", params={"confirm": True}).json() == {"cleared": True}
+    assert client.delete("/api/data", headers=GUARD).status_code == 400
+    cleared = client.delete("/api/data", params={"confirm": True}, headers=GUARD)
+    assert cleared.json() == {"cleared": True}
     assert client.get("/api/stats").json()["sessions"] == 0
 
 
@@ -121,3 +125,19 @@ def test_mcp_endpoint_is_mounted(db):
                      "Mcp-Method": "tools/list", "MCP-Protocol-Version": "2026-07-28"})
         assert response.status_code == 200
         assert "find_problems" in response.text
+
+
+def test_mutations_require_guard_header_and_local_host(client):
+    assert client.delete("/api/data", params={"confirm": True}).status_code == 403
+    rebound = client.delete("/api/data", params={"confirm": True},
+                            headers={**GUARD, "Host": "evil.example:8484"})
+    assert rebound.status_code == 403
+    ipv6 = client.delete("/api/data", headers={**GUARD, "Host": "[::1]"})
+    assert ipv6.status_code == 400  # passed the guard, failed on confirm
+    assert client.get("/api/stats").status_code == 200  # reads are not guarded
+
+
+def test_replay_endpoint_errors(client):
+    missing = client.post("/api/exchanges/999/replay", json={}, headers=GUARD)
+    assert missing.status_code == 409
+    assert "not found" in missing.json()["detail"]

@@ -14,6 +14,8 @@ from mcp.client.stdio import StdioServerParameters
 
 from mcphawk.analysis import lint
 from mcphawk.query import Query
+from mcphawk.replay import replay
+from mcphawk.store import Recorder
 from mcphawk.web.app import create_app
 
 FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "sdk_server.py"
@@ -75,6 +77,15 @@ async def test_stdio_through_wrap(db, mode, era):
     if era == "modern":
         errors = [f for f in lint.lint_session(q, session["id"]) if f["severity"] == "error"]
         assert errors == [], errors
+
+    # replay the weather call against the real server, with an edited city
+    original = q.get_exchange(calls[0]["id"])["request"]["body"]["params"]
+    recorder = Recorder(db)
+    result = await replay(q, recorder, calls[0]["id"],
+                          {**original, "arguments": {"city": "Lima"}})
+    assert result["status"] == "ok"
+    assert result["response"]["result"]["content"][0]["text"] == "Sunny in Lima"
+    recorder.close()
     q.close()
 
 
