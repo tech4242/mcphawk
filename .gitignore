@@ -1,7 +1,6 @@
 *.db
 tests/test_logs/
 .claude
-CLAUDE.md
 .DS_Store
 
 # Node modules
